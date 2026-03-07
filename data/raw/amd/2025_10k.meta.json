@@ -1,0 +1,10 @@
+{
+  "ticker": "AMD",
+  "company": "amd",
+  "form_type": "10-K/A",
+  "fiscal_year": 2025,
+  "fiscal_year_source": "header_text",
+  "filed_at": "2026-02-04T15:06:57-05:00",
+  "accession_no": "0000002488-26-000021",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000000248826000021/amd-20251227.htm"
+}

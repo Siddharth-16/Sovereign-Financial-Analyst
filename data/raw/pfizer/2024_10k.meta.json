@@ -1,0 +1,10 @@
+{
+  "ticker": "PFE",
+  "company": "pfizer",
+  "form_type": "10-K",
+  "fiscal_year": 2024,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2024-02-22T13:17:37-05:00",
+  "accession_no": "0000078003-24-000039",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/78003/000007800324000039/pfe-20231231.htm"
+}

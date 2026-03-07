@@ -1,9 +1,12 @@
+#ui.py
 import logging
-import streamlit as st
-import sys
 import os
+import sys
+
+import streamlit as st
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from app.agent import ask_agent
+from app.agent import ask_agent_stream
 
 logging.getLogger("tornado.websocket").setLevel(logging.CRITICAL)
 
@@ -13,13 +16,14 @@ st.set_page_config(
     layout="centered",
 )
 
-# ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "pending" not in st.session_state:
     st.session_state.pending = None
 if "sc" not in st.session_state:
     st.session_state.sc = 0
+if "current_company" not in st.session_state:
+    st.session_state.current_company = None
 
 SUGGESTIONS = [
     "What are the 3 main risks in Nvidia's 10-K?",
@@ -29,22 +33,35 @@ SUGGESTIONS = [
 ]
 
 
-# ── Single prompt handler — used by both chips and chat input ─────────────────
 def process_prompt(prompt: str):
+    st.session_state.sc += 1 
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Analysing..."):
-            reply = ask_agent(prompt)
-        st.markdown(reply)
+    current_company = st.session_state.current_company
+    final_company = current_company
+    collected_chunks: list[str] = []
 
+    with st.chat_message("assistant"):
+        def response_stream():
+            nonlocal final_company
+
+            for event in ask_agent_stream(prompt, current_company):
+                if event["type"] == "token":
+                    collected_chunks.append(event["content"])
+                    yield event["content"]
+                elif event["type"] == "done":
+                    final_company = event["company"]
+
+        rendered = st.write_stream(response_stream)
+
+    reply = rendered if isinstance(rendered, str) else "".join(collected_chunks)
+    st.session_state.current_company = final_company
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("📊 Sovereign FA")
     st.caption("Privacy-first · Local LLM · Agentic RAG")
@@ -56,8 +73,9 @@ with st.sidebar:
     st.divider()
 
     st.subheader("Indexed Filings")
-    st.markdown("**NVDA** — Nvidia Corporation")
-    st.code("10-K · FY2024", language=None)
+    st.markdown("**20 companies · FY2023–FY2025**")
+    if st.session_state.current_company:
+        st.caption(f"Active company context: {st.session_state.current_company}")
     st.divider()
 
     st.subheader("Add Filing")
@@ -69,18 +87,16 @@ with st.sidebar:
     if st.button("🗑 Clear conversation"):
         st.session_state.messages = []
         st.session_state.pending = None
+        st.session_state.current_company = None
         st.session_state.sc += 1
         st.rerun()
 
     st.caption("All data stays local · Zero telemetry")
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 st.title("Sovereign Financial Analyst")
 st.caption("Ask anything about indexed 10-K filings and live stock data. Everything runs locally.")
 st.divider()
 
-# Suggestions only shown when chat is empty
 if not st.session_state.messages:
     st.markdown("**Suggested queries**")
     col1, col2 = st.columns(2)
@@ -89,21 +105,18 @@ if not st.session_state.messages:
         with col:
             if st.button(text, key=f"s{i}_{st.session_state.sc}", use_container_width=True):
                 st.session_state.pending = text
-                st.session_state.sc += 1
+                st.session_state.sc += 1  # must increment BEFORE rerun
                 st.rerun()
     st.divider()
 
-# Render chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Handle suggestion chip click
 if st.session_state.pending:
     prompt = st.session_state.pending
     st.session_state.pending = None
     process_prompt(prompt)
 
-# Handle typed input
 if prompt := st.chat_input("Ask about a 10-K filing or stock performance..."):
     process_prompt(prompt)

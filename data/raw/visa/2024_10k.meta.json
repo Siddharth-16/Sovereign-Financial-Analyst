@@ -1,0 +1,10 @@
+{
+  "ticker": "V",
+  "company": "visa",
+  "form_type": "10-K",
+  "fiscal_year": 2024,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2024-11-13T17:14:01-05:00",
+  "accession_no": "0001403161-24-000058",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316124000058/v-20240930.htm"
+}

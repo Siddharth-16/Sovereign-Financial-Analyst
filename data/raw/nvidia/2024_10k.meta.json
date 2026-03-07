@@ -1,0 +1,10 @@
+{
+  "ticker": "NVDA",
+  "company": "nvidia",
+  "form_type": "10-K",
+  "fiscal_year": 2024,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2024-02-21T16:36:57-05:00",
+  "accession_no": "0001045810-24-000029",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581024000029/nvda-20240128.htm"
+}

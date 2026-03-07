@@ -1,0 +1,10 @@
+{
+  "ticker": "WMT",
+  "company": "walmart",
+  "form_type": "10-K",
+  "fiscal_year": 2023,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2023-03-17T17:02:59-04:00",
+  "accession_no": "0000104169-23-000020",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/104169/000010416923000020/wmt-20230131.htm"
+}

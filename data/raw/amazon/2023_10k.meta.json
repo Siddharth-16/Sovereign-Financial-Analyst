@@ -1,0 +1,10 @@
+{
+  "ticker": "AMZN",
+  "company": "amazon",
+  "form_type": "10-K",
+  "fiscal_year": 2023,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2023-02-02T18:27:34-05:00",
+  "accession_no": "0001018724-23-000004",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872423000004/amzn-20221231.htm"
+}

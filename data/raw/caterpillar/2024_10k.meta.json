@@ -1,0 +1,10 @@
+{
+  "ticker": "CAT",
+  "company": "caterpillar",
+  "form_type": "10-K",
+  "fiscal_year": 2024,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2024-02-16T10:05:13-05:00",
+  "accession_no": "0000018230-24-000009",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/18230/000001823024000009/cat-20231231.htm"
+}

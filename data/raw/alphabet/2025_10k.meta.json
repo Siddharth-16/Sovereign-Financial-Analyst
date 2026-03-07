@@ -1,0 +1,10 @@
+{
+  "ticker": "GOOG",
+  "company": "alphabet",
+  "form_type": "10-K",
+  "fiscal_year": 2025,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2025-02-04T20:41:40-05:00",
+  "accession_no": "0001652044-25-000014",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204425000014/goog-20241231.htm"
+}

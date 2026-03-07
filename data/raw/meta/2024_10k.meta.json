@@ -1,0 +1,10 @@
+{
+  "ticker": "META",
+  "company": "meta",
+  "form_type": "10-K",
+  "fiscal_year": 2024,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2024-02-01T19:39:02-05:00",
+  "accession_no": "0001326801-24-000012",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000132680124000012/meta-20231231.htm"
+}

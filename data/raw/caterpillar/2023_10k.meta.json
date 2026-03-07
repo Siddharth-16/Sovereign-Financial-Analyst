@@ -1,0 +1,10 @@
+{
+  "ticker": "CAT",
+  "company": "caterpillar",
+  "form_type": "10-K",
+  "fiscal_year": 2023,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2023-02-15T10:27:56-05:00",
+  "accession_no": "0000018230-23-000011",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/18230/000001823023000011/cat-20221231.htm"
+}

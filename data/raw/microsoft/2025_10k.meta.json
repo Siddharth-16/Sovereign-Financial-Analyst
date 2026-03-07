@@ -1,0 +1,10 @@
+{
+  "ticker": "MSFT",
+  "company": "microsoft",
+  "form_type": "10-K",
+  "fiscal_year": 2025,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2025-07-30T16:11:40-04:00",
+  "accession_no": "0000950170-25-100235",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm"
+}

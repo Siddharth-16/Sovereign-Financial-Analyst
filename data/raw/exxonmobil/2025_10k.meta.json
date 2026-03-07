@@ -1,0 +1,10 @@
+{
+  "ticker": "XOM",
+  "company": "exxonmobil",
+  "form_type": "10-K",
+  "fiscal_year": 2025,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2025-02-19T16:39:37-05:00",
+  "accession_no": "0000034088-25-000010",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/34088/000003408825000010/xom-20241231.htm"
+}

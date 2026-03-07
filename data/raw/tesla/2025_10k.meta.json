@@ -1,0 +1,10 @@
+{
+  "ticker": "TSLA",
+  "company": "tesla",
+  "form_type": "10-K/A",
+  "fiscal_year": 2025,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2025-04-30T17:08:56-04:00",
+  "accession_no": "0001104659-25-042659",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1318605/000110465925042659/tm252787d2_10ka.htm"
+}

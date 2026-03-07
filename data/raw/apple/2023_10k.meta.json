@@ -1,0 +1,10 @@
+{
+  "ticker": "AAPL",
+  "company": "apple",
+  "form_type": "10-K",
+  "fiscal_year": 2023,
+  "fiscal_year_source": "filed_at",
+  "filed_at": "2023-11-02T18:08:27-04:00",
+  "accession_no": "0000320193-23-000106",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/aapl-20230930.htm"
+}
