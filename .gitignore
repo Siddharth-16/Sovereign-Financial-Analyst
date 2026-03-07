@@ -1,5 +1,6 @@
+chroma_db/
+.env
 venv/
 __pycache__/
 *.pyc
-.env
-chroma_db/
+.DS_Storeg
