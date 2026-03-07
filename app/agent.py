@@ -1,6 +1,6 @@
 from langchain.agents import create_agent
 from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from app.tools import get_stock_performance, query_financial_reports
 
@@ -45,6 +45,32 @@ def detect_mismatch(user_input: str) -> bool:
             return True
     return False
 
+def run_agent_ui(user_input: str) -> str:
+    lowered = user_input.lower()
+
+    has_company = any(c in lowered for c in SUPPORTED_COMPANIES)
+    has_financial_intent = any(k in lowered for k in FINANCIAL_KEYWORDS)
+
+    if has_financial_intent and not has_company:
+        return "Please specify a company. Currently indexed: **Nvidia (NVDA)**."
+
+    if not has_financial_intent and not has_company:
+        return "I can only answer financial questions about indexed companies. Try asking about Nvidia's 10-K risks or NVDA stock performance."
+
+    if detect_mismatch(user_input):
+        return (
+            "⚠ **Inconsistency detected**: the company name and stock ticker in your query "
+            "refer to different companies. Please clarify which company you want data for."
+        )
+
+    result = agent.invoke({"messages": [HumanMessage(content=user_input)]})
+
+    for msg in reversed(result["messages"]):
+        if isinstance(msg, AIMessage) and msg.content and not getattr(msg, "tool_calls", None):
+            return msg.content
+
+    return "No response generated. Please try rephrasing your question."
+
 def run_agent(user_input: str):
     lowered = user_input.lower()
 
@@ -63,7 +89,6 @@ def run_agent(user_input: str):
         print("Inconsistency detected: the company name and stock ticker refer to different companies. Please clarify.")
         return
 
-    # ← this was the missing line
     result = agent.invoke({"messages": [HumanMessage(content=user_input)]})
     print(result["messages"][-1].content)
 
