@@ -1,193 +1,225 @@
-#agent.py
-from typing import Any, Iterator
-
-from langgraph.prebuilt import create_react_agent
+from typing import Optional
 from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
+import re
 
-from app.tools import get_stock_performance, query_financial_reports
-from app.config import (
-    OLLAMA_MODEL,
-    SYSTEM_PROMPT,
-    SUPPORTED_COMPANIES,
-    FINANCIAL_KEYWORDS,
+from app.tools import (
+    get_stock_performance,
+    query_financial_reports,
     TICKER_TO_COMPANY,
+    SLUG_TO_DISPLAY,
+    SLUG_TO_TICKER,
 )
+
+from app.config import OLLAMA_MODEL, FINANCIAL_KEYWORDS
 
 llm = ChatOllama(model=OLLAMA_MODEL, temperature=0)
-tools = [get_stock_performance, query_financial_reports]
 
-agent = create_react_agent(
-    model=llm,
-    tools=tools,
-    prompt=SystemMessage(content=SYSTEM_PROMPT),
-)
-
-NORMALIZED_TICKER_TO_COMPANY = {k.lower(): v for k, v in TICKER_TO_COMPANY.items()}
+NORMALIZED_TICKER_MAP = {k.lower(): v for k, v in TICKER_TO_COMPANY.items()}
 
 COMPANY_ALIASES = {
-    "nvidia": "Nvidia",
-    "apple": "Apple",
-    "tesla": "Tesla",
-    "microsoft": "Microsoft",
-    "amazon": "Amazon",
-    "alphabet": "Alphabet",
-    "meta": "Meta",
-    "amd": "AMD",
-    "broadcom": "Broadcom",
-    "caterpillar": "Caterpillar",
-    "boeing": "Boeing",
-    "general electric": "General Electric",
-    "jpmorgan chase": "JPMorgan Chase",
-    "goldman sachs": "Goldman Sachs",
-    "visa": "Visa",
-    "johnson & johnson": "Johnson & Johnson",
-    "eli lilly": "Eli Lilly",
-    "pfizer": "Pfizer",
-    "exxonmobil": "ExxonMobil",
-    "walmart": "Walmart",
+    "nvidia": "nvidia",
+    "apple": "apple",
+    "tesla": "tesla",
+    "microsoft": "microsoft",
+    "amazon": "amazon",
+    "alphabet": "alphabet",
+    "google": "alphabet",
+    "meta": "meta",
+    "amd": "amd",
+    "broadcom": "broadcom",
+    "caterpillar": "caterpillar",
+    "boeing": "boeing",
+    "general electric": "general_electric",
+    "jpmorgan": "jpmorgan_chase",
+    "jpmorgan chase": "jpmorgan_chase",
+    "goldman sachs": "goldman_sachs",
+    "visa": "visa",
+    "johnson & johnson": "johnson_and_johnson",
+    "eli lilly": "eli_lilly",
+    "pfizer": "pfizer",
+    "exxonmobil": "exxonmobil",
+    "walmart": "walmart",
 }
 
+def find_tickers(text: str) -> list[str]:
+    lowered = text.lower()
+    found = []
 
-def extract_company_from_text(user_input: str) -> str | None:
-    lowered = user_input.lower()
+    for ticker in NORMALIZED_TICKER_MAP:
+        pattern = rf"\b{re.escape(ticker)}\b"
+        if re.search(pattern, lowered):
+            found.append(ticker)
 
-    for ticker, company in NORMALIZED_TICKER_TO_COMPANY.items():
-        if ticker in lowered:
-            return company
+    return found
 
-    for alias, company in COMPANY_ALIASES.items():
+def extract_company(text: str) -> Optional[str]:
+    lowered = text.lower()
+
+    for ticker in find_tickers(text):
+        return NORMALIZED_TICKER_MAP[ticker]
+
+    for alias, company_slug in COMPANY_ALIASES.items():
         if alias in lowered:
-            return company
+            return company_slug
 
     return None
 
 
-def detect_mismatch(user_input: str) -> bool:
-    lowered = user_input.lower()
-    explicit_company = extract_company_from_text(user_input)
+def extract_explicit_company_name(text: str) -> Optional[str]:
+    lowered = text.lower()
 
-    found_tickers = [ticker for ticker in NORMALIZED_TICKER_TO_COMPANY if ticker in lowered]
+    for alias, company_slug in COMPANY_ALIASES.items():
+        if alias in lowered:
+            return company_slug
+
+    return None
+
+
+def detect_mismatch(text: str) -> bool:
+    explicit_company = extract_explicit_company_name(text)
+
+    if explicit_company is None:
+        return False
+
+    found_tickers = find_tickers(text)
+
     for ticker in found_tickers:
-        mapped_company = NORMALIZED_TICKER_TO_COMPANY[ticker]
-        if explicit_company and mapped_company.lower() != explicit_company.lower():
+        mapped_company = NORMALIZED_TICKER_MAP[ticker]
+        if mapped_company != explicit_company:
             return True
+
     return False
 
 
-def validate_query(
+def validate(
     user_input: str,
-    conversation_company: str | None = None,
-) -> tuple[str | None, str | None]:
+    conversation_company: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str]]:
     lowered = user_input.lower()
-    explicit_company = extract_company_from_text(user_input)
-    active_company = explicit_company or conversation_company
-    has_financial_intent = any(k in lowered for k in FINANCIAL_KEYWORDS)
+    explicit = extract_company(user_input)
+    active = explicit or conversation_company
+    has_intent = any(k in lowered for k in FINANCIAL_KEYWORDS)
 
     if detect_mismatch(user_input):
         return (
-            "⚠ **Inconsistency detected**: the company name and stock ticker in your query refer to different companies. Please clarify which company you want data for.",
-            active_company,
+            "⚠ **Inconsistency**: the company name and ticker refer to different companies. Please clarify.",
+            active,
         )
 
-    if has_financial_intent and not active_company:
-        return "Please specify a company.", None
+    if has_intent and not active:
+        return "Please specify a company to analyze.", None
 
-    if not has_financial_intent and not active_company:
+    if not has_intent and not active:
         return (
-            "This system is designed for company-specific financial analysis. "
-            "Ask about a company’s 10-K risks, revenue trends, business segments, or stock performance.",
+            "I can only answer questions about company 10-K filings and stock performance.",
             None,
         )
 
-    return None, active_company
+    return None, active
 
 
-def build_effective_input(
+def infer_needs(user_input: str) -> tuple[bool, bool]:
+    lowered = user_input.lower()
+
+    filing_keywords = {
+        "10-k", "risk", "risks", "revenue", "r&d", "net income",
+        "business", "segment", "segments", "filing", "strategy",
+        "risk factors", "revenue trend", "summarize", "compare"
+    }
+
+    stock_keywords = {
+        "stock", "price", "performing", "performance", "trading",
+        "market", "high", "low", "volume"
+    }
+
+    needs_filings = any(k in lowered for k in filing_keywords)
+    needs_stock = any(k in lowered for k in stock_keywords)
+
+    return needs_filings, needs_stock
+
+
+def build_answer(
     user_input: str,
-    conversation_company: str | None = None,
-) -> tuple[str | None, str | None, str | None]:
-    """
-    Returns:
-      (error_message, effective_input, active_company)
-    """
-    error, active_company = validate_query(user_input, conversation_company)
+    company_slug: str,
+    filing_context: Optional[str] = None,
+    stock_context: Optional[dict] = None,
+) -> str:
+    company_name = SLUG_TO_DISPLAY.get(company_slug, company_slug)
+
+    system_prompt = f"""
+You are Sovereign Financial Analyst, a precise financial research assistant.
+
+Rules:
+- Answer only the user's question.
+- Do not mention tools, function calls, or internal system behavior.
+- Do not output JSON.
+- Keep the answer concise and professional.
+- If the user asks for 3 risks, provide exactly 3.
+- If filing data is unavailable, state that directly.
+- If stock data is unavailable, state that directly.
+- Do not invent facts beyond the provided context.
+- Ignore irrelevant or conflicting details from unrelated companies.
+
+Company: {company_name}
+"""
+
+    user_prompt = f"""
+User question:
+{user_input}
+
+Filing context:
+{filing_context if filing_context else "No filing data available."}
+
+Stock context:
+{stock_context if stock_context else "No stock data available."}
+
+Write the final answer for the user.
+"""
+
+    response = llm.invoke(
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+    )
+    return response.content if hasattr(response, "content") else str(response)
+
+
+def ask_agent(
+    user_input: str,
+    conversation_company: Optional[str] = None,
+) -> tuple[str, Optional[str]]:
+    error, active_company = validate(user_input, conversation_company)
     if error:
-        return error, None, active_company
+        return error, active_company
 
     effective_input = user_input
-    if active_company and not extract_company_from_text(user_input):
-        effective_input = f"For {active_company}, {user_input}"
+    if active_company and not extract_company(user_input):
+        company_name = SLUG_TO_DISPLAY.get(active_company, active_company)
+        effective_input = f"For {company_name}, {user_input}"
 
-    return None, effective_input, active_company
+    needs_filings, needs_stock = infer_needs(effective_input)
 
+    filing_context = None
+    stock_context = None
 
-def _chunk_to_text(chunk: Any) -> str:
-    """
-    Extract text safely from streamed LangGraph/LangChain message chunks.
-    """
-    content = getattr(chunk, "content", None)
+    if needs_filings:
+        filing_context = query_financial_reports(
+            query=effective_input,
+            company=active_company,
+            fiscal_year=None,
+        )
 
-    if isinstance(content, str):
-        return content
+    if needs_stock:
+        ticker = SLUG_TO_TICKER.get(active_company)
+        if ticker:
+            stock_context = get_stock_performance(ticker)
 
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str):
-                    parts.append(text)
-        return "".join(parts)
+    reply = build_answer(
+        user_input=effective_input,
+        company_slug=active_company,
+        filing_context=filing_context,
+        stock_context=stock_context,
+    )
 
-    return ""
-
-
-def extract_final_response(result: dict) -> str:
-    for msg in reversed(result["messages"]):
-        if isinstance(msg, AIMessage) and msg.content and not getattr(msg, "tool_calls", None):
-            return msg.content
-    return "No response generated. Please try rephrasing your question."
-
-
-def ask_agent_stream(
-    user_input: str,
-    conversation_company: str | None = None,
-) -> Iterator[dict]:
-    error, effective_input, active_company = build_effective_input(user_input, conversation_company)
-    if error:
-        yield {"type": "token", "content": error}
-        yield {"type": "done", "company": active_company}
-        return
-
-    emitted_any = False
-
-    try:
-        for chunk, metadata in agent.stream(
-            {"messages": [HumanMessage(content=effective_input)]},
-            stream_mode="messages",
-        ):
-            if (
-                isinstance(chunk, AIMessage)
-                and not getattr(chunk, "tool_calls", None)
-                and chunk.content
-            ):
-                text = _chunk_to_text(chunk)
-                if text:
-                    emitted_any = True
-                    yield {"type": "token", "content": text}
-
-    except Exception as e:
-        print(f"Streaming failed, falling back: {e}")
-        reply, _ = ask_agent(user_input, conversation_company)
-        yield {"type": "token", "content": reply}
-        yield {"type": "done", "company": active_company}
-        return
-
-    if not emitted_any:
-        reply, _ = ask_agent(user_input, conversation_company)
-        yield {"type": "token", "content": reply}
-
-    yield {"type": "done", "company": active_company}
+    return reply, active_company
