@@ -181,9 +181,14 @@ def build_answer(
     user_input: str,
     company_slug: str,
     filing_context: Optional[str] = None,
+    filing_citations: Optional[list[str]] = None,
     stock_context: Optional[dict] = None,
+    stock_citation: Optional[str] = None,
 ) -> str:
     company_name = SLUG_TO_DISPLAY.get(company_slug, company_slug)
+
+    filing_citations_text = "\n".join(f"- {c}" for c in (filing_citations or []))
+    stock_citation_text = stock_citation if stock_citation else "None"
 
     system_prompt = f"""
 You are Sovereign Financial Analyst, a precise financial research assistant.
@@ -199,6 +204,8 @@ Rules:
 - Do not invent facts beyond the provided context.
 - Ignore irrelevant or conflicting details from unrelated companies.
 - For business segment questions, prefer formal reportable segments named in the filing.
+- End the answer with a short "Sources:" section when source information is available.
+- In the Sources section, use only the provided citation labels. Do not invent new ones.
 
 Company: {company_name}
 """
@@ -210,8 +217,14 @@ User question:
 Filing context:
 {filing_context if filing_context else "No filing data available."}
 
+Filing citations:
+{filing_citations_text if filing_citations_text else "None"}
+
 Stock context:
 {stock_context if stock_context else "No stock data available."}
+
+Stock citation:
+{stock_citation_text}
 
 Write the final answer for the user.
 """
@@ -241,27 +254,35 @@ def ask_agent(
     needs_filings, needs_stock = infer_needs(effective_input)
 
     filing_context = None
+    filing_citations = []
     stock_context = None
+    stock_citation = None
 
     if needs_filings:
         section = infer_section(effective_input)
-        filing_context = query_financial_reports(
+        filing_result = query_financial_reports(
             query=effective_input,
             company=active_company,
             fiscal_year=None,
             section=section,
         )
+        filing_context = filing_result.get("content")
+        filing_citations = filing_result.get("citations", [])
 
     if needs_stock:
         ticker = SLUG_TO_TICKER.get(active_company)
         if ticker:
-            stock_context = get_stock_performance(ticker)
+            stock_result = get_stock_performance(ticker)
+            stock_context = stock_result.get("data")
+            stock_citation = stock_result.get("citation")
 
     reply = build_answer(
         user_input=effective_input,
         company_slug=active_company,
         filing_context=filing_context,
+        filing_citations=filing_citations,
         stock_context=stock_context,
+        stock_citation=stock_citation,
     )
 
     return reply, active_company

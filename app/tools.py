@@ -150,19 +150,28 @@ def get_stock_performance(ticker: str) -> dict:
     ticker = ticker.strip().upper()
 
     if ticker in INVALID_TICKERS:
-        return {"error": f"Invalid ticker '{ticker}'."}
+        return {
+            "error": f"Invalid ticker '{ticker}'.",
+            "citation": None,
+        }
 
     hist = yf.Ticker(ticker).history(period="5d")
     if hist.empty:
-        return {"error": f"No stock data found for '{ticker}'."}
+        return {
+            "error": f"No stock data found for '{ticker}'.",
+            "citation": None,
+        }
 
     latest = hist.iloc[-1]
     return {
-        "ticker": ticker,
-        "latest_price": round(float(latest["Close"]), 2),
-        "high": round(float(latest["High"]), 2),
-        "low": round(float(latest["Low"]), 2),
-        "volume": int(latest["Volume"]),
+        "data": {
+            "ticker": ticker,
+            "latest_price": round(float(latest["Close"]), 2),
+            "high": round(float(latest["High"]), 2),
+            "low": round(float(latest["Low"]), 2),
+            "volume": int(latest["Volume"]),
+        },
+        "citation": f"{ticker} market data (latest 5d window)",
     }
 
 def query_financial_reports(
@@ -170,7 +179,7 @@ def query_financial_reports(
     company: str,
     fiscal_year: Optional[int] = None,
     section: Optional[str] = None,
-) -> str:
+) -> dict:
     """
     Search local 10-K filings for a specific company.
     Optionally filter by fiscal year and section.
@@ -193,17 +202,47 @@ def query_financial_reports(
 
     docs = db.similarity_search(query, k=4, filter=filter_dict)
 
+    display = SLUG_TO_DISPLAY.get(company_slug, company_slug)
+
     if not docs:
-        display = SLUG_TO_DISPLAY.get(company_slug, company_slug)
-
         if fiscal_year is not None and section_slug is not None:
-            return f"{display} FY{fiscal_year} {section_slug} content is not indexed in the database."
+            return {
+                "content": f"{display} FY{fiscal_year} {section_slug} content is not indexed in the database.",
+                "citations": [],
+            }
         if fiscal_year is not None:
-            return f"{display} FY{fiscal_year} 10-K is not indexed in the database."
+            return {
+                "content": f"{display} FY{fiscal_year} 10-K is not indexed in the database.",
+                "citations": [],
+            }
         if section_slug is not None:
-            return f"{display} {section_slug} content is not indexed in the database."
+            return {
+                "content": f"{display} {section_slug} content is not indexed in the database.",
+                "citations": [],
+            }
 
-        return f"{display} 10-K filings are not indexed in the database."
+        return {
+            "content": f"{display} 10-K filings are not indexed in the database.",
+            "citations": [],
+        }
 
-    return "\n\n".join(clean_filing_text(doc.page_content) for doc in docs)
+    cleaned_chunks = []
+    citations = []
+
+    for doc in docs:
+        cleaned_chunks.append(clean_filing_text(doc.page_content))
+
+        md = doc.metadata
+        fy = md.get("fiscal_year", "unknown")
+        sec = md.get("section", "full_filing")
+        company_name = md.get("company", display)
+
+        citation = f"{company_name} 10-K FY{fy}, {sec}"
+        if citation not in citations:
+            citations.append(citation)
+
+    return {
+        "content": "\n\n".join(cleaned_chunks),
+        "citations": citations,
+    }
     
