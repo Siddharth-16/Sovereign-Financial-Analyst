@@ -1,8 +1,10 @@
 from typing import Optional
+import re
+
 import yfinance as yf
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-import re
+
 from app.config import CHROMA_PATH, EMBED_MODEL
 
 embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
@@ -117,12 +119,21 @@ SECTION_NAME_MAP = {
     "financials": "financial_statements",
 }
 
+SECTION_DISPLAY_MAP = {
+    "business": "Business",
+    "risk_factors": "Risk Factors",
+    "mdna": "MD&A",
+    "financial_statements": "Financial Statements",
+    "full_filing": "Full Filing",
+}
+
+
 def normalize_section(section: Optional[str]) -> Optional[str]:
     if not section:
         return None
-
     lowered = section.strip().lower()
     return SECTION_NAME_MAP.get(lowered, lowered)
+
 
 def clean_filing_text(text: str) -> str:
     text = re.sub(r"http[s]?://\S+", "", text)
@@ -130,6 +141,7 @@ def clean_filing_text(text: str) -> str:
     text = re.sub(r"Item\s+1A\.\s*Risk Factors", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
 
 def normalize_company(company: Optional[str]) -> Optional[str]:
     if not company:
@@ -145,6 +157,16 @@ def normalize_company(company: Optional[str]) -> Optional[str]:
         return COMPANY_NAME_MAP[lowered]
 
     return lowered
+
+
+def format_filing_citation(company_name: str, fiscal_year: int | str, section: str) -> str:
+    section_display = SECTION_DISPLAY_MAP.get(section, section.replace("_", " ").title())
+    return f"{company_name} 10-K FY{fiscal_year} – {section_display}"
+
+
+def format_stock_citation(ticker: str) -> str:
+    return f"{ticker} market data – latest 5d window"
+
 
 def get_stock_performance(ticker: str) -> dict:
     ticker = ticker.strip().upper()
@@ -171,8 +193,9 @@ def get_stock_performance(ticker: str) -> dict:
             "low": round(float(latest["Low"]), 2),
             "volume": int(latest["Volume"]),
         },
-        "citation": f"{ticker} market data (latest 5d window)",
+        "citation": format_stock_citation(ticker),
     }
+
 
 def query_financial_reports(
     query: str,
@@ -195,11 +218,7 @@ def query_financial_reports(
     if section_slug is not None:
         conditions.append({"section": section_slug})
 
-    if len(conditions) == 1:
-        filter_dict = conditions[0]
-    else:
-        filter_dict = {"$and": conditions}
-
+    filter_dict = conditions[0] if len(conditions) == 1 else {"$and": conditions}
     docs = db.similarity_search(query, k=4, filter=filter_dict)
 
     display = SLUG_TO_DISPLAY.get(company_slug, company_slug)
@@ -237,7 +256,7 @@ def query_financial_reports(
         sec = md.get("section", "full_filing")
         company_name = md.get("company", display)
 
-        citation = f"{company_name} 10-K FY{fy}, {sec}"
+        citation = format_filing_citation(company_name, fy, sec)
         if citation not in citations:
             citations.append(citation)
 

@@ -1,6 +1,7 @@
 from typing import Optional
-from langchain_ollama import ChatOllama
 import re
+
+from langchain_ollama import ChatOllama
 
 from app.tools import (
     get_stock_performance,
@@ -41,6 +42,7 @@ COMPANY_ALIASES = {
     "walmart": "walmart",
 }
 
+
 def find_tickers(text: str) -> list[str]:
     lowered = text.lower()
     found = []
@@ -52,32 +54,54 @@ def find_tickers(text: str) -> list[str]:
 
     return found
 
-def extract_company(text: str) -> Optional[str]:
-    lowered = text.lower()
 
+def find_company_aliases(text: str) -> list[str]:
+    lowered = text.lower()
+    found = []
+
+    for alias, company_slug in COMPANY_ALIASES.items():
+        pattern = rf"\b{re.escape(alias)}\b"
+        if re.search(pattern, lowered) and company_slug not in found:
+            found.append(company_slug)
+
+    return found
+
+
+def extract_company(text: str) -> Optional[str]:
     for ticker in find_tickers(text):
         return NORMALIZED_TICKER_MAP[ticker]
 
-    for alias, company_slug in COMPANY_ALIASES.items():
-        if alias in lowered:
-            return company_slug
+    aliases = find_company_aliases(text)
+    if aliases:
+        return aliases[0]
 
     return None
 
 
 def extract_explicit_company_name(text: str) -> Optional[str]:
-    lowered = text.lower()
-
-    for alias, company_slug in COMPANY_ALIASES.items():
-        if alias in lowered:
-            return company_slug
-
+    aliases = find_company_aliases(text)
+    if aliases:
+        return aliases[0]
     return None
+
+
+def extract_companies(text: str) -> list[str]:
+    companies: list[str] = []
+
+    for company_slug in find_company_aliases(text):
+        if company_slug not in companies:
+            companies.append(company_slug)
+
+    for ticker in find_tickers(text):
+        company_slug = NORMALIZED_TICKER_MAP[ticker]
+        if company_slug not in companies:
+            companies.append(company_slug)
+
+    return companies
 
 
 def detect_mismatch(text: str) -> bool:
     explicit_company = extract_explicit_company_name(text)
-
     if explicit_company is None:
         return False
 
@@ -91,20 +115,29 @@ def detect_mismatch(text: str) -> bool:
     return False
 
 
+def is_compare_query(text: str) -> bool:
+    lowered = text.lower()
+    compare_markers = {"compare", "vs", "versus", "difference", "different"}
+    return any(marker in lowered for marker in compare_markers)
+
+
 def validate(
     user_input: str,
     conversation_company: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[str]]:
     lowered = user_input.lower()
-    explicit = extract_company(user_input)
+    companies = extract_companies(user_input)
+    explicit = companies[0] if companies else extract_company(user_input)
     active = explicit or conversation_company
     has_intent = any(k in lowered for k in FINANCIAL_KEYWORDS)
 
-    if detect_mismatch(user_input):
-        return (
-            "⚠ **Inconsistency**: the company name and ticker refer to different companies. Please clarify.",
-            active,
-        )
+    # allow true comparison queries with >= 2 companies
+    if not (is_compare_query(user_input) and len(companies) >= 2):
+        if detect_mismatch(user_input):
+            return (
+                "⚠ **Inconsistency**: the company name and ticker refer to different companies. Please clarify.",
+                active,
+            )
 
     if has_intent and not active:
         return "Please specify a company to analyze.", None
@@ -136,6 +169,7 @@ def infer_needs(user_input: str) -> tuple[bool, bool]:
     needs_stock = any(k in lowered for k in stock_keywords)
 
     return needs_filings, needs_stock
+
 
 def infer_section(user_input: str) -> Optional[str]:
     lowered = user_input.lower()
@@ -176,7 +210,6 @@ def infer_section(user_input: str) -> Optional[str]:
 
     return None
 
-
 def build_answer(
     user_input: str,
     company_slug: str,
@@ -187,7 +220,7 @@ def build_answer(
 ) -> str:
     company_name = SLUG_TO_DISPLAY.get(company_slug, company_slug)
 
-    filing_citations_text = "\n".join(f"- {c}" for c in (filing_citations or []))
+    filing_citations_text = "\n".join(f"• {c}" for c in (filing_citations or []))
     stock_citation_text = stock_citation if stock_citation else "None"
 
     system_prompt = f"""
@@ -204,8 +237,15 @@ Rules:
 - Do not invent facts beyond the provided context.
 - Ignore irrelevant or conflicting details from unrelated companies.
 - For business segment questions, prefer formal reportable segments named in the filing.
+- For revenue trend questions, prefer total company revenue and overall year-over-year trend.
+- Do not mix in segment growth or segment commentary unless the user explicitly asks about segments.
+- If a value is not clearly available in the provided context, say it is not available instead of guessing.
 - End the answer with a short "Sources:" section when source information is available.
 - In the Sources section, use only the provided citation labels. Do not invent new ones.
+- Put each source on its own new line as a bullet.
+- Never place sources inline in a sentence.
+- If the question is only about stock performance, do not mention filing availability unless the filing is directly relevant.
+- If the question is only about filings, do not mention stock data.
 
 Company: {company_name}
 """
@@ -228,7 +268,76 @@ Stock citation:
 
 Write the final answer for the user.
 """
+    response = llm.invoke(
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+    )
+    return response.content if hasattr(response, "content") else str(response)
 
+def build_comparison_answer(
+    user_input: str,
+    company_a: str,
+    company_b: str,
+    context_a: Optional[str],
+    context_b: Optional[str],
+    citations_a: list[str],
+    citations_b: list[str],
+) -> str:
+    company_a_name = SLUG_TO_DISPLAY.get(company_a, company_a)
+    company_b_name = SLUG_TO_DISPLAY.get(company_b, company_b)
+
+    citations_a_text = "\n".join(f"• {c}" for c in citations_a)
+    citations_b_text = "\n".join(f"• {c}" for c in citations_b)
+
+    system_prompt = """
+You are Sovereign Financial Analyst, a precise financial research assistant.
+
+Rules:
+- Answer only the user's question.
+- Compare only the two companies provided.
+- Be structured, concise, and professional.
+- Focus on the most material similarities and differences only.
+- Give 2–3 similarities and 2–3 differences at most.
+- Keep the full comparison under 8 sentences total, excluding the Sources section.
+- Do not invent facts beyond the provided context.
+- Do not add extra commentary or conclusions unless directly supported by the context.
+- End the answer with a short "Sources:" section when source information is available.
+- In the Sources section, use only the provided citation labels.
+- Put each source on its own new line as a bullet.
+- Never place sources inline in a sentence.
+
+Preferred format:
+Similarities:
+- ...
+- ...
+
+Differences:
+- ...
+- ...
+"""
+
+    user_prompt = f"""
+User question:
+{user_input}
+
+Company A: {company_a_name}
+Context A:
+{context_a if context_a else "No filing data available."}
+
+Citations A:
+{citations_a_text if citations_a_text else "None"}
+
+Company B: {company_b_name}
+Context B:
+{context_b if context_b else "No filing data available."}
+
+Citations B:
+{citations_b_text if citations_b_text else "None"}
+
+Write a comparison answer for the user.
+"""
     response = llm.invoke(
         [
             {"role": "system", "content": system_prompt},
@@ -245,6 +354,38 @@ def ask_agent(
     error, active_company = validate(user_input, conversation_company)
     if error:
         return error, active_company
+
+    companies = extract_companies(user_input)
+
+    # comparison mode
+    if is_compare_query(user_input) and len(companies) >= 2:
+        company_a, company_b = companies[0], companies[1]
+        section = infer_section(user_input)
+
+        result_a = query_financial_reports(
+            query=user_input,
+            company=company_a,
+            fiscal_year=None,
+            section=section,
+        )
+        result_b = query_financial_reports(
+            query=user_input,
+            company=company_b,
+            fiscal_year=None,
+            section=section,
+        )
+
+        reply = build_comparison_answer(
+            user_input=user_input,
+            company_a=company_a,
+            company_b=company_b,
+            context_a=result_a.get("content"),
+            context_b=result_b.get("content"),
+            citations_a=result_a.get("citations", []),
+            citations_b=result_b.get("citations", []),
+        )
+
+        return reply, None
 
     effective_input = user_input
     if active_company and not extract_company(user_input):

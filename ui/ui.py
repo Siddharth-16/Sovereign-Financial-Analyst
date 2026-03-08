@@ -5,7 +5,7 @@ import sys
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from app.agent import ask_agent  # simple invoke, no streaming
+from app.agent import ask_agent  
 
 logging.getLogger("tornado.websocket").setLevel(logging.CRITICAL)
 
@@ -38,7 +38,6 @@ DISPLAY_NAMES = {
     "walmart": "Walmart",
 }
 
-# ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "pending" not in st.session_state:
@@ -52,7 +51,7 @@ SUGGESTIONS = [
     "What are the 3 main risks in Nvidia's 10-K?",
     "How is NVDA stock performing today?",
     "What is Nvidia's revenue trend from the filing?",
-    "Summarize Nvidia's key business segments.",
+    "Compare Nvidia and AMD risk factors.",
 ]
 
 
@@ -72,11 +71,8 @@ def process_prompt(prompt: str):
 
     st.session_state.current_company = active_company
     st.session_state.messages.append({"role": "assistant", "content": reply})
-    # Increment counter AFTER response so suggestion buttons get fresh keys
     st.session_state.sc += 1
 
-
-# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("📊 Sovereign FA")
     st.caption("Privacy-first · Local LLM · Agentic RAG")
@@ -94,10 +90,20 @@ with st.sidebar:
         st.caption(f"Active context: **{pretty}**")
     st.divider()
 
-    st.subheader("Add Filing")
+    st.subheader("Upload Filing (Future Feature)")
     uploaded = st.file_uploader("Upload a 10-K PDF", type=["pdf"])
+
     if uploaded:
-        st.warning(f"Ingestion coming soon.\n\n**{uploaded.name}** received.")
+        st.info(
+            f"""
+    PDF upload detected: **{uploaded.name}**
+
+    Dynamic ingestion is not enabled in this demo version.
+
+    To add new filings, place them in the `data/raw/` directory and run the ingestion pipeline.
+    """
+        )
+
     st.divider()
 
     if st.button("🗑 Clear conversation"):
@@ -109,13 +115,10 @@ with st.sidebar:
 
     st.caption("All data stays local · Zero telemetry")
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 st.title("Sovereign Financial Analyst")
 st.caption("Ask anything about indexed 10-K filings and live stock data. Everything runs locally.")
 st.divider()
 
-# ── Suggestion chips — always visible, counter ensures re-clicks always fire ──
 with st.expander("💡 Suggested queries", expanded=len(st.session_state.messages) == 0):
     col1, col2 = st.columns(2)
     for i, text in enumerate(SUGGESTIONS):
@@ -128,17 +131,14 @@ with st.expander("💡 Suggested queries", expanded=len(st.session_state.message
 
 st.divider()
 
-# ── Chat history ──────────────────────────────────────────────────────────────
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ── Handle suggestion click ───────────────────────────────────────────────────
 if st.session_state.pending:
     prompt = st.session_state.pending
     st.session_state.pending = None
     process_prompt(prompt)
 
-# ── Handle typed input ────────────────────────────────────────────────────────
 if prompt := st.chat_input("Ask about a 10-K filing or stock performance..."):
     process_prompt(prompt)
