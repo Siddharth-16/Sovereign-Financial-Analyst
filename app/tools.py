@@ -105,6 +105,25 @@ SLUG_TO_TICKER = {
     "walmart": "WMT",
 }
 
+SECTION_NAME_MAP = {
+    "business": "business",
+    "risk_factors": "risk_factors",
+    "risks": "risk_factors",
+    "risk": "risk_factors",
+    "mdna": "mdna",
+    "mda": "mdna",
+    "management_discussion": "mdna",
+    "financial_statements": "financial_statements",
+    "financials": "financial_statements",
+}
+
+def normalize_section(section: Optional[str]) -> Optional[str]:
+    if not section:
+        return None
+
+    lowered = section.strip().lower()
+    return SECTION_NAME_MAP.get(lowered, lowered)
+
 def clean_filing_text(text: str) -> str:
     text = re.sub(r"http[s]?://\S+", "", text)
     text = re.sub(r"\bTable of Contents\b", "", text, flags=re.IGNORECASE)
@@ -127,7 +146,6 @@ def normalize_company(company: Optional[str]) -> Optional[str]:
 
     return lowered
 
-
 def get_stock_performance(ticker: str) -> dict:
     ticker = ticker.strip().upper()
 
@@ -147,34 +165,44 @@ def get_stock_performance(ticker: str) -> dict:
         "volume": int(latest["Volume"]),
     }
 
-
 def query_financial_reports(
     query: str,
     company: str,
     fiscal_year: Optional[int] = None,
+    section: Optional[str] = None,
 ) -> str:
     """
     Search local 10-K filings for a specific company.
-    Optionally filter by fiscal year if the user explicitly requests one.
+    Optionally filter by fiscal year and section.
     """
     company_slug = normalize_company(company)
+    section_slug = normalize_section(section)
 
-    if fiscal_year is None:
-        filter_dict = {"company_slug": company_slug}
+    conditions = [{"company_slug": company_slug}]
+
+    if fiscal_year is not None:
+        conditions.append({"fiscal_year": fiscal_year})
+
+    if section_slug is not None:
+        conditions.append({"section": section_slug})
+
+    if len(conditions) == 1:
+        filter_dict = conditions[0]
     else:
-        filter_dict = {
-            "$and": [
-                {"company_slug": company_slug},
-                {"fiscal_year": fiscal_year},
-            ]
-        }
+        filter_dict = {"$and": conditions}
 
     docs = db.similarity_search(query, k=4, filter=filter_dict)
 
     if not docs:
         display = SLUG_TO_DISPLAY.get(company_slug, company_slug)
+
+        if fiscal_year is not None and section_slug is not None:
+            return f"{display} FY{fiscal_year} {section_slug} content is not indexed in the database."
         if fiscal_year is not None:
             return f"{display} FY{fiscal_year} 10-K is not indexed in the database."
+        if section_slug is not None:
+            return f"{display} {section_slug} content is not indexed in the database."
+
         return f"{display} 10-K filings are not indexed in the database."
 
     return "\n\n".join(clean_filing_text(doc.page_content) for doc in docs)

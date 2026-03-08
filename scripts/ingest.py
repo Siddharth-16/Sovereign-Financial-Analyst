@@ -1,7 +1,7 @@
-#ingest.py
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -14,7 +14,6 @@ from app.config import CHROMA_PATH, EMBED_MODEL
 
 RAW_DATA_ROOT = Path("data/raw")
 
-# Map folder slug -> display company name / ticker
 COMPANY_METADATA = {
     "nvidia": {"company": "Nvidia", "ticker": "NVDA"},
     "microsoft": {"company": "Microsoft", "ticker": "MSFT"},
@@ -38,6 +37,24 @@ COMPANY_METADATA = {
     "walmart": {"company": "Walmart", "ticker": "WMT"},
 }
 
+SECTION_HEADINGS = {
+    "business": [
+        "item 1 business",
+    ],
+    "risk_factors": [
+        "item 1a risk factors",
+    ],
+    "mdna": [
+        "item 7 management s discussion and analysis of financial condition and results of operations",
+        "item 7 management discussion and analysis of financial condition and results of operations",
+        "item 7 management s discussion and analysis",
+        "item 7 management discussion and analysis",
+    ],
+    "financial_statements": [
+        "item 8 financial statements and supplementary data",
+        "item 8 financial statements",
+    ],
+}
 
 if not os.getenv("HF_TOKEN"):
     print("Warning: HF_TOKEN not set. HuggingFace downloads may be rate limited.")
@@ -47,29 +64,27 @@ def html_to_text(html: str) -> str:
     """Convert SEC filing HTML into clean visible text."""
     soup = BeautifulSoup(html, "html.parser")
 
-    # remove unwanted tags
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
 
     text = soup.get_text(separator="\n", strip=True)
 
-    # collapse excessive blank lines
     lines = [line.strip() for line in text.splitlines()]
     lines = [line for line in lines if line]
     return "\n".join(lines)
 
+def normalize_heading(line: str) -> str:
+    line = line.strip().lower()
+    line = re.sub(r"[^\w\s]", " ", line)
+    line = re.sub(r"\s+", " ", line)
+    return line
 
 def parse_filing_metadata(file_path: Path) -> dict:
-    """
-    Example path:
-    data/raw/nvidia/2025_10k.html
-    """
     company_slug = file_path.parent.name
     filename = file_path.stem  # e.g. 2025_10k
 
-    fiscal_year_str, filing_type = filename.split("_", 1)
+    fiscal_year_str, _ = filename.split("_", 1)
     fiscal_year = int(fiscal_year_str)
-    filing_type = filing_type.upper()  # 10K -> 10K / or keep 10-K below
 
     if company_slug not in COMPANY_METADATA:
         raise ValueError(f"Unknown company folder: {company_slug}")
@@ -85,26 +100,72 @@ def parse_filing_metadata(file_path: Path) -> dict:
         "source_path": str(file_path),
     }
 
+def split_into_sections(text: str) -> dict[str, str]:
+    lines = text.splitlines()
 
-def load_html_filing(file_path: Path) -> Document:
-    """Load one HTML filing and return a LangChain Document."""
-    metadata = parse_filing_metadata(file_path)
+    heading_positions: list[tuple[str, int]] = []
+
+    for i, line in enumerate(lines):
+        normalized = normalize_heading(line)
+
+        for section_name, heading_variants in SECTION_HEADINGS.items():
+            if normalized in heading_variants:
+                heading_positions.append((section_name, i))
+                break
+
+    # remove duplicates, keep first occurrence of each section
+    seen = set()
+    deduped: list[tuple[str, int]] = []
+    for section_name, line_idx in heading_positions:
+        if section_name not in seen:
+            deduped.append((section_name, line_idx))
+            seen.add(section_name)
+
+    heading_positions = deduped
+
+    if not heading_positions:
+        return {"full_filing": text}
+
+    sections: dict[str, str] = {}
+
+    for idx, (section_name, start_line) in enumerate(heading_positions):
+        end_line = heading_positions[idx + 1][1] if idx + 1 < len(heading_positions) else len(lines)
+        section_text = "\n".join(lines[start_line:end_line]).strip()
+
+        if len(section_text) > 1000:
+            sections[section_name] = section_text
+
+    if not sections:
+        return {"full_filing": text}
+
+    return sections
+
+def load_html_filing(file_path: Path) -> list[Document]:
+    """Load one HTML filing and return section-level LangChain Documents."""
+    base_metadata = parse_filing_metadata(file_path)
 
     html = file_path.read_text(encoding="utf-8", errors="ignore")
     text = html_to_text(html)
+    sections = split_into_sections(text)
 
-    return Document(page_content=text, metadata=metadata)
+    print(f"{file_path.name} sections found: {list(sections.keys())}")
+
+    docs: list[Document] = []
+    for section_name, section_text in sections.items():
+        metadata = {**base_metadata, "section": section_name}
+        docs.append(Document(page_content=section_text, metadata=metadata))
+
+    return docs
 
 
 def collect_documents(data_root: Path) -> list[Document]:
-    """Walk data/raw and load all *_10k.html filings."""
     docs: list[Document] = []
 
     for file_path in sorted(data_root.glob("*/*_10k.html")):
         try:
-            doc = load_html_filing(file_path)
-            docs.append(doc)
-            print(f"Loaded: {file_path}")
+            filing_docs = load_html_filing(file_path)
+            docs.extend(filing_docs)
+            print(f"Loaded: {file_path} ({len(filing_docs)} sections)")
         except Exception as e:
             print(f"Skipping {file_path}: {e}")
 
@@ -127,7 +188,7 @@ def ingest_all() -> None:
         print("No filings found.")
         return
 
-    print(f"Loaded {len(documents)} filings.")
+    print(f"Loaded {len(documents)} section documents.")
 
     chunks = chunk_documents(documents)
     print(f"Created {len(chunks)} chunks.")

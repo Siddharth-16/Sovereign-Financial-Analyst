@@ -137,6 +137,45 @@ def infer_needs(user_input: str) -> tuple[bool, bool]:
 
     return needs_filings, needs_stock
 
+def infer_section(user_input: str) -> Optional[str]:
+    lowered = user_input.lower()
+
+    risk_keywords = {
+        "risk", "risks", "risk factors", "regulatory risk",
+        "supply chain risk", "export risk", "geopolitical risk"
+    }
+
+    mdna_keywords = {
+        "revenue", "revenue trend", "growth", "margin", "gross margin",
+        "operating income", "profit", "net income", "cash flow",
+        "drivers", "financial performance", "results of operations"
+    }
+
+    business_keywords = {
+        "business", "business model", "segments", "segment",
+        "products", "customers", "competition", "strategy",
+        "strategic priorities", "market position"
+    }
+
+    financial_keywords = {
+        "balance sheet", "income statement", "financial statements",
+        "financials", "assets", "liabilities"
+    }
+
+    if any(k in lowered for k in risk_keywords):
+        return "risk_factors"
+
+    if any(k in lowered for k in mdna_keywords):
+        return "mdna"
+
+    if any(k in lowered for k in business_keywords):
+        return "business"
+
+    if any(k in lowered for k in financial_keywords):
+        return "financial_statements"
+
+    return None
+
 
 def build_answer(
     user_input: str,
@@ -159,6 +198,7 @@ Rules:
 - If stock data is unavailable, state that directly.
 - Do not invent facts beyond the provided context.
 - Ignore irrelevant or conflicting details from unrelated companies.
+- For business segment questions, prefer formal reportable segments named in the filing.
 
 Company: {company_name}
 """
@@ -204,10 +244,12 @@ def ask_agent(
     stock_context = None
 
     if needs_filings:
+        section = infer_section(effective_input)
         filing_context = query_financial_reports(
             query=effective_input,
             company=active_company,
             fiscal_year=None,
+            section=section,
         )
 
     if needs_stock:
