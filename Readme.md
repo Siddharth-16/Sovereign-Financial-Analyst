@@ -88,39 +88,15 @@ The entire system runs locally:
 
 # 🧱 System Architecture
 
-```
-User Query
-   │
-   ▼
-Streamlit UI
-   │
-   ▼
-Agent (Intent + Company Detection)
-   │
-   ├── Filing Retrieval Tool
-   │       │
-   │       ▼
-   │   ChromaDB Vector Search
-   │       │
-   │       ▼
-   │   Section-Filtered 10-K Chunks
-   │
-   └── Stock Data Tool
-           │
-           ▼
-        yfinance API
-   │
-   ▼
-Context Assembly
-   │
-   ▼
-Local LLM (Ollama · Llama 3.1)
-   │
-   ▼
-Answer + Citations
-```
+![System Architecture](Screenshots/fa_sa.png)
+Sovereign Financial Analyst uses a local agentic RAG pipeline to answer financial questions from SEC 10-K filings and live market data.
 
----
+- The **Streamlit UI** accepts user queries
+- The **Agent Logic** identifies the company, intent, and required tools
+- The **Filing Retrieval Tool** queries section-aware 10-K embeddings stored in **ChromaDB**
+- The **Stock Data Tool** retrieves current market information through **yfinance**
+- Retrieved context is passed to a **local LLM (Ollama + Llama 3.1)**
+- The model generates a grounded response with **citations**
 
 # 🗂 Dataset
 
@@ -306,7 +282,7 @@ MIT License
 
 # 👨‍💻 Author
 
-Built by **Siddharth Najwala**
+Built by **Siddharth Anajwala**
 
 ---
 
