@@ -264,7 +264,9 @@ data/
 ui/
    ui.py             # Streamlit interface
 
-ingest.py            # filing ingestion pipeline
+scripts/
+   ingest.py            # filing ingestion pipeline
+   data.py             # download SEC 10-K filings using SEC API
 ```
 
 ---
