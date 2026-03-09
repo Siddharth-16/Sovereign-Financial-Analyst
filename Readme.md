@@ -199,7 +199,7 @@ Example sections:
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/sovereign-financial-analyst.git
+git clone https://github.com/Siddharth-16/Sovereign-Financial-Analyst.git
 cd sovereign-financial-analyst
 ```
 
