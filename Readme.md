@@ -1,4 +1,5 @@
 # Sovereign Financial Analyst
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
 ![Ollama](https://img.shields.io/badge/LLM-Ollama-green)
@@ -243,6 +244,14 @@ Pull the model:
 
 ```bash
 ollama pull llama3.1
+```
+
+---
+
+# Download SEC Filings
+
+```bash
+python scripts/data.py
 ```
 
 ---
