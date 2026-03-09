@@ -232,6 +232,14 @@ ollama pull llama3.1
 
 ---
 
+# 📚 Build the Vector Database
+
+```bash
+python scripts/ingest.py
+```
+
+---
+
 # 📊 Run the Application
 
 ```bash
