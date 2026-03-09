@@ -1,4 +1,4 @@
-# 📊 Sovereign Financial Analyst
+# Sovereign Financial Analyst
 
 **Sovereign Financial Analyst** is a **local AI financial research assistant** that analyzes **SEC 10-K filings** and **live stock data** using an **agentic Retrieval-Augmented Generation (RAG) system**.
 
@@ -14,20 +14,20 @@ All inference runs **locally** using **Ollama + Llama 3.1**, ensuring privacy an
 
 ---
 
-# 🚀 Features
+# Features
 
-## 🧠 Agentic Financial Analysis
+## Agentic Financial Analysis
 
 The agent automatically decides which tools to use based on the query:
 
-- 📑 **10-K filing retrieval**
-- 📈 **Live stock data**
-- 🔎 **Section-specific analysis**
-- ⚖️ **Multi-company comparison**
+- **10-K filing retrieval**
+- **Live stock data**
+- **Section-specific analysis**
+- **Multi-company comparison**
 
 ---
 
-## 📑 Section-Aware 10-K Retrieval
+## Section-Aware 10-K Retrieval
 
 Instead of searching entire filings, the system retrieves specific sections:
 
@@ -40,7 +40,7 @@ This improves retrieval precision and reduces hallucinations.
 
 ---
 
-## 📈 Live Stock Data Integration
+## Live Stock Data Integration
 
 The system integrates **live market data** using `yfinance` to answer questions like:
 
@@ -50,7 +50,7 @@ The system integrates **live market data** using `yfinance` to answer questions 
 
 ---
 
-## ⚖️ Cross-Company Comparison
+## Cross-Company Comparison
 
 Users can compare companies directly.
 
@@ -64,7 +64,7 @@ The agent retrieves relevant sections from both filings and generates a structur
 
 ---
 
-## 📚 Grounded Citations
+## Grounded Citations
 
 All answers include **citations from the original filings**, such as:
 
@@ -76,7 +76,7 @@ Sources:
 
 ---
 
-## 🔒 Fully Local AI Stack
+## Fully Local AI Stack
 
 The entire system runs locally:
 
@@ -86,7 +86,7 @@ The entire system runs locally:
 
 ---
 
-# 🧱 System Architecture
+# System Architecture
 
 ![System Architecture](Screenshots/fa_sa.png)
 Sovereign Financial Analyst uses a local agentic RAG pipeline to answer financial questions from SEC 10-K filings and live market data.
@@ -98,7 +98,7 @@ Sovereign Financial Analyst uses a local agentic RAG pipeline to answer financia
 - Retrieved context is passed to a **local LLM (Ollama + Llama 3.1)**
 - The model generates a grounded response with **citations**
 
-# 🗂 Dataset
+# Dataset
 
 The system currently indexes **20 public companies** including:
 
@@ -123,7 +123,7 @@ All filings are stored locally and processed into vector embeddings.
 
 ---
 
-# 💬 Example Queries
+# Example Queries
 
 ### Risk Analysis
 
@@ -151,23 +151,23 @@ Compare Nvidia and AMD risk factors.
 
 ---
 
-# 🖥 UI Preview
+# UI Preview
 
 Below are sample interactions from the application.
 
-### 📑 Risk Analysis
+### Risk Analysis
 
 Shows section-aware retrieval from Nvidia's 10-K.
 
 ![Risk Query](Screenshots/risk_query.png)
 
-### 📈 Stock Data
+### Stock Data
 
 Shows live NVDA market data retrieved through the stock data tool.
 
 ![Stock Query](Screenshots/stock_query.png)
 
-### ⚖️ Company Comparison
+### Company Comparison
 
 Shows cross-company comparison of Nvidia and AMD risk factors.
 
@@ -175,7 +175,7 @@ Shows cross-company comparison of Nvidia and AMD risk factors.
 
 ---
 
-# 🛠 Tech Stack
+# Tech Stack
 
 ### AI / ML
 
@@ -204,7 +204,7 @@ Shows cross-company comparison of Nvidia and AMD risk factors.
 
 ---
 
-# 📦 Installation
+# Installation
 
 Clone the repository:
 
@@ -228,7 +228,7 @@ pip install -r requirements.txt
 
 ---
 
-# 🧠 Start the Local LLM
+# Start the Local LLM
 
 Install and run Ollama:
 
@@ -242,7 +242,7 @@ ollama pull llama3.1
 
 ---
 
-# 📚 Build the Vector Database
+# Build the Vector Database
 
 ```bash
 python scripts/ingest.py
@@ -250,7 +250,7 @@ python scripts/ingest.py
 
 ---
 
-# 📊 Run the Application
+# Run the Application
 
 ```bash
 streamlit run ui/ui.py
@@ -258,7 +258,7 @@ streamlit run ui/ui.py
 
 ---
 
-# 📂 Project Structure
+# Project Structure
 
 ```
 sovereign-financial-analyst/
@@ -281,7 +281,7 @@ scripts/
 
 ---
 
-# 🔮 Future Improvements
+# Future Improvements
 
 Possible extensions:
 
@@ -294,19 +294,7 @@ Possible extensions:
 
 ---
 
-# 📜 License
-
-MIT License
-
----
-
-# 👨‍💻 Author
-
-Built by **Siddharth Anajwala**
-
----
-
-# ⭐ Why This Project
+# Why This Project
 
 Financial filings contain **critical information for investors and analysts**, but they are extremely long and difficult to navigate.
 
