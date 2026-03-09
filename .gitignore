@@ -3,4 +3,5 @@ chroma_db/
 venv/
 __pycache__/
 *.pyc
-.DS_Storeg
+.DS_Store
+data/raw
