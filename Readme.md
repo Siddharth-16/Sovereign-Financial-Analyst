@@ -153,9 +153,9 @@ Compare Nvidia and AMD risk factors.
 
 # 🖥 UI Preview
 
-![Risk Query](Screenshots/risk_query.png)
-![Stock Query](Screenshots/stock_query.png)
-![Comparison Query](Screenshots/comparison_query.png)
+| Risk Analysis                             | Stock Data                                  | Company Comparison                                    |
+| ----------------------------------------- | ------------------------------------------- | ----------------------------------------------------- |
+| ![Risk Query](Screenshots/risk_query.png) | ![Stock Query](Screenshots/stock_query.png) | ![Comparison Query](Screenshots/comparison_query.png) |
 
 Example sections:
 
