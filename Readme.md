@@ -157,7 +157,7 @@ Below are sample interactions from the application.
 
 ### 📑 Risk Analysis
 
-Shows section-aware retrieval from Nvidia's 10-K with grounded citations.
+Shows section-aware retrieval from Nvidia's 10-K.
 
 ![Risk Query](Screenshots/risk_query.png)
 
