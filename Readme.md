@@ -153,15 +153,25 @@ Compare Nvidia and AMD risk factors.
 
 # 🖥 UI Preview
 
-| Risk Analysis                             | Stock Data                                  | Company Comparison                                    |
-| ----------------------------------------- | ------------------------------------------- | ----------------------------------------------------- |
-| ![Risk Query](Screenshots/risk_query.png) | ![Stock Query](Screenshots/stock_query.png) | ![Comparison Query](Screenshots/comparison_query.png) |
+Below are sample interactions from the application.
 
-Example sections:
+### 📑 Risk Analysis
 
-- RAG answer with citations
-- Stock data query
-- Multi-company comparison
+Shows section-aware retrieval from Nvidia's 10-K with grounded citations.
+
+![Risk Query](Screenshots/risk_query.png)
+
+### 📈 Stock Data
+
+Shows live NVDA market data retrieved through the stock data tool.
+
+![Stock Query](Screenshots/stock_query.png)
+
+### ⚖️ Company Comparison
+
+Shows cross-company comparison of Nvidia and AMD risk factors.
+
+![Comparison Query](Screenshots/comparison_query.png)
 
 ---
 
