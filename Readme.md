@@ -1,10 +1,9 @@
 # Sovereign Financial Analyst
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-green)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.29%2B-orange)
-![Ollama](https://img.shields.io/badge/Ollama-Llama_3.1-white)
-![LangGraph](https://img.shields.io/badge/LangGraph-Agentic-blueviolet)
-![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Store-lightgrey)
+![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
+![Ollama](https://img.shields.io/badge/LLM-Ollama-green)
+![LangChain](https://img.shields.io/badge/Framework-LangChain-purple)
+![ChromaDB](https://img.shields.io/badge/VectorDB-ChromaDB-orange)
 
 **Sovereign Financial Analyst** is a **local AI financial research assistant** that analyzes **SEC 10-K filings** and **live stock data** using an **agentic Retrieval-Augmented Generation (RAG) system**.
 
