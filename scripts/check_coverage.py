@@ -9,12 +9,22 @@ from app.config import CHROMA_PATH, EMBED_MODEL
 from app.companies import COMPANIES, TARGET_FISCAL_YEARS, REQUIRED_SECTIONS
 
 
-def load_indexed_metadata() -> list[dict]:
+def load_indexed_metadata(batch_size: int = 500) -> list[dict]:
     """Pull every chunk's metadata out of the persisted Chroma collection."""
     embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
-    result = db.get(include=["metadatas"])
-    return result.get("metadatas", []) or []
+
+    all_metadatas: list[dict] = []
+    offset = 0
+    while True:
+        result = db.get(include=["metadatas"], limit=batch_size, offset=offset)
+        ids = result.get("ids", []) or []
+        if not ids:
+            break
+        all_metadatas.extend(result.get("metadatas", []) or [])
+        offset += len(ids)
+
+    return all_metadatas
 
 
 def build_coverage_map(metadatas: list[dict]) -> dict[tuple[str, int], set[str]]:

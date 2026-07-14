@@ -63,37 +63,95 @@ def parse_filing_metadata(file_path: Path) -> dict:
         "source_path": str(file_path),
     }
 
+def build_normalized_text_with_offsets(text: str) -> tuple[str, list[int]]:
+    """Collapse the ENTIRE document to a single normalized string, while
+    keeping a mapping from each character in the normalized string back to
+    its offset in the original text.
+
+    Large-cap 10-Ks are often produced by financial printers that render
+    text with heavy inline markup -- sometimes one HTML tag per word (or
+    even per line-break), purely for pixel-perfect kerning. BeautifulSoup's
+    get_text(separator="\\n") then turns a single heading like
+    "Item 1A. Risk Factors" into many separate lines: "Item", "1A.",
+    "Risk", "Factors". No fixed-size line window can reliably re-join an
+    arbitrary number of fragments.
+
+    The robust fix is to stop treating line breaks as meaningful at all
+    when looking for headings: collapse every run of whitespace (including
+    newlines) to a single space, lowercase, and strip punctuation, exactly
+    like normalize_heading() does for a single line -- but across the
+    *whole document* at once. A heading fragmented across any number of
+    lines/tags becomes indistinguishable from one written on a single
+    line, so exact-substring matching becomes reliable again. The
+    character-offset map lets us translate a match's position in the
+    normalized string back to a real slice of the original text.
+    """
+    norm_chars: list[str] = []
+    offsets: list[int] = []
+    prev_was_space = True  # collapse leading whitespace too
+
+    for i, ch in enumerate(text):
+        if ch.isalnum():
+            out_ch = ch.lower()
+            is_space = False
+        else:
+            out_ch = " "
+            is_space = True
+
+        if is_space:
+            if prev_was_space:
+                continue
+            prev_was_space = True
+        else:
+            prev_was_space = False
+
+        norm_chars.append(out_ch)
+        offsets.append(i)
+
+    return "".join(norm_chars), offsets
+
+
+def find_heading_matches(text: str) -> dict[str, list[int]]:
+    """Section name -> sorted list of ORIGINAL-text character offsets where
+    that heading occurs, found via whole-document normalized substring
+    search (see build_normalized_text_with_offsets)."""
+    normalized, offsets = build_normalized_text_with_offsets(text)
+
+    matches: dict[str, list[int]] = {name: [] for name in SECTION_HEADINGS}
+
+    for section_name, heading_variants in SECTION_HEADINGS.items():
+        for variant in heading_variants:
+            start = 0
+            while True:
+                idx = normalized.find(variant, start)
+                if idx == -1:
+                    break
+                matches[section_name].append(offsets[idx])
+                start = idx + 1  # allow overlapping/adjacent matches
+
+    return {name: positions for name, positions in matches.items() if positions}
+
+
 def split_into_sections(text: str) -> dict[str, str]:
-    lines = text.splitlines()
+    matches = find_heading_matches(text)
 
-    heading_positions: list[tuple[str, int]] = []
-
-    for i, line in enumerate(lines):
-        normalized = normalize_heading(line)
-
-        for section_name, heading_variants in SECTION_HEADINGS.items():
-            if normalized in heading_variants:
-                heading_positions.append((section_name, i))
-                break
-
-    # remove duplicates, keep first occurrence of each section
-    seen = set()
-    deduped: list[tuple[str, int]] = []
-    for section_name, line_idx in heading_positions:
-        if section_name not in seen:
-            deduped.append((section_name, line_idx))
-            seen.add(section_name)
-
-    heading_positions = deduped
-
-    if not heading_positions:
+    if not matches:
         return {"full_filing": text}
+
+    # For each section, take the LAST matching offset as the real heading.
+    # In a standard 10-K, the Table of Contents lists every Item heading
+    # before the real body, so earlier matches are TOC/cross-reference
+    # noise and the final occurrence is the actual section start.
+    heading_positions = [
+        (section_name, max(positions)) for section_name, positions in matches.items()
+    ]
+    heading_positions.sort(key=lambda pair: pair[1])
 
     sections: dict[str, str] = {}
 
-    for idx, (section_name, start_line) in enumerate(heading_positions):
-        end_line = heading_positions[idx + 1][1] if idx + 1 < len(heading_positions) else len(lines)
-        section_text = "\n".join(lines[start_line:end_line]).strip()
+    for idx, (section_name, start_offset) in enumerate(heading_positions):
+        end_offset = heading_positions[idx + 1][1] if idx + 1 < len(heading_positions) else len(text)
+        section_text = text[start_offset:end_offset].strip()
 
         if len(section_text) > 1000:
             sections[section_name] = section_text
