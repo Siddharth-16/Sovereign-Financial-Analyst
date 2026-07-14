@@ -6,7 +6,7 @@
 ![LangChain](https://img.shields.io/badge/Framework-LangChain-purple)
 ![ChromaDB](https://img.shields.io/badge/VectorDB-ChromaDB-orange)
 
-**Sovereign Financial Analyst** is a **local AI financial research assistant** that analyzes **SEC 10-K filings** and **live stock data** using an **agentic Retrieval-Augmented Generation (RAG) system**.
+**Sovereign Financial Analyst** is a **local AI financial research assistant** that analyzes **SEC 10-K filings** and **live stock data** using a **rule-based orchestration layer with LLM synthesis** on top of a **Retrieval-Augmented Generation (RAG) pipeline**.
 
 The system allows users to ask natural language questions about corporate filings such as:
 
@@ -22,9 +22,9 @@ All inference runs **locally** using **Ollama + Llama 3.1**, ensuring privacy an
 
 # Features
 
-## Agentic Financial Analysis
+## Rule-Based Query Routing
 
-The agent automatically decides which tools to use based on the query:
+Keyword and regex matching in `app/agent.py` automatically determines which tools to call based on the query:
 
 - **10-K filing retrieval**
 - **Live stock data**
@@ -95,10 +95,10 @@ The entire system runs locally:
 # System Architecture
 
 ![System Architecture](Screenshots/fa_sa.png)
-Sovereign Financial Analyst uses a local agentic RAG pipeline to answer financial questions from SEC 10-K filings and live market data.
+Sovereign Financial Analyst uses a local RAG pipeline with rule-based orchestration to answer financial questions from SEC 10-K filings and live market data.
 
 - The **Streamlit UI** accepts user queries
-- The **Agent Logic** identifies the company, intent, and required tools
+- The **Rule-Based Router** (`app/agent.py`) identifies the company, intent, and required tools via keyword/regex matching
 - The **Filing Retrieval Tool** queries section-aware 10-K embeddings stored in **ChromaDB**
 - The **Stock Data Tool** retrieves current market information through **yfinance**
 - Retrieved context is passed to a **local LLM (Ollama + Llama 3.1)**
@@ -264,6 +264,18 @@ python scripts/ingest.py
 
 ---
 
+# Verify Ingestion Coverage
+
+Section splitting relies on exact heading-string matches, which can fail silently on
+filings with non-standard HTML formatting. After ingesting, confirm every company x
+fiscal year actually produced all 4 sections:
+
+```bash
+python scripts/check_coverage.py
+```
+
+---
+
 # Run the Application
 
 ```bash
@@ -278,9 +290,10 @@ streamlit run ui/ui.py
 sovereign-financial-analyst/
 
 app/
-   agent.py          # agent decision logic
+   agent.py          # rule-based query routing + LLM synthesis
    tools.py          # retrieval + stock tools
    config.py         # configuration
+   companies.py      # single source of truth: company/ticker/section data
 
 data/
    raw/              # raw 10-K filings
@@ -290,7 +303,8 @@ ui/
 
 scripts/
    ingest.py            # filing ingestion pipeline
-   data.py             # download SEC 10-K filings using SEC API
+   data.py              # download SEC 10-K filings using SEC API
+   check_coverage.py    # verifies ingestion produced all companies x years x sections
 ```
 
 ---
@@ -299,6 +313,7 @@ scripts/
 
 Possible extensions:
 
+- **True LLM-driven tool-calling** (LangChain tool-calling agent) to replace the current keyword/regex router
 - Dynamic **PDF ingestion from the UI**
 - **Financial metric extraction**
 - **SEC filing summarization**
@@ -318,4 +333,4 @@ MIT License
 
 Financial filings contain **critical information for investors and analysts**, but they are extremely long and difficult to navigate.
 
-This project demonstrates how **agentic AI + RAG** can transform complex regulatory filings into **interactive financial intelligence**.
+This project demonstrates how **RAG + rule-based orchestration** can transform complex regulatory filings into **interactive financial intelligence**.
