@@ -1,15 +1,14 @@
 from __future__ import annotations
-
 import json
 import os
 import re
 import time
 from pathlib import Path
 from typing import Any
-
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from sec_api import QueryApi, RenderApi
+from app.companies import SLUG_TO_TICKER, TARGET_FISCAL_YEARS
 
 load_dotenv()
 
@@ -23,29 +22,9 @@ render_api = RenderApi(api_key=API_KEY)
 DATA_ROOT = Path("data/raw")
 
 COMPANIES: dict[str, str] = {
-    "NVDA": "nvidia",
-    "MSFT": "microsoft",
-    "AAPL": "apple",
-    "AMZN": "amazon",
-    "GOOG": "alphabet",
-    "META": "meta",
-    "AMD": "amd",
-    "AVGO": "broadcom",
-    "TSLA": "tesla",
-    "CAT": "caterpillar",
-    "BA": "boeing",
-    "GE": "general_electric",
-    "JPM": "jpmorgan_chase",
-    "GS": "goldman_sachs",
-    "V": "visa",
-    "JNJ": "johnson_and_johnson",
-    "LLY": "eli_lilly",
-    "PFE": "pfizer",
-    "XOM": "exxonmobil",
-    "WMT": "walmart",
+    ticker: slug for slug, ticker in SLUG_TO_TICKER.items()
 }
 
-TARGET_FISCAL_YEARS = {2023, 2024, 2025}
 MAX_RESULTS = 12
 DOWNLOAD_RETRIES = 3
 SLEEP_SECONDS = 0.2

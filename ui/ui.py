@@ -1,11 +1,11 @@
 import logging
 import os
 import sys
-
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from app.agent import ask_agent  
+from app.agent import ask_agent
+from app.companies import SLUG_TO_DISPLAY as DISPLAY_NAMES  
 
 logging.getLogger("tornado.websocket").setLevel(logging.CRITICAL)
 
@@ -14,29 +14,6 @@ st.set_page_config(
     page_icon="📊",
     layout="centered",
 )
-
-DISPLAY_NAMES = {
-    "nvidia": "Nvidia",
-    "apple": "Apple",
-    "tesla": "Tesla",
-    "microsoft": "Microsoft",
-    "amazon": "Amazon",
-    "alphabet": "Alphabet",
-    "meta": "Meta",
-    "amd": "AMD",
-    "broadcom": "Broadcom",
-    "caterpillar": "Caterpillar",
-    "boeing": "Boeing",
-    "general_electric": "General Electric",
-    "jpmorgan_chase": "JPMorgan Chase",
-    "goldman_sachs": "Goldman Sachs",
-    "visa": "Visa",
-    "johnson_and_johnson": "Johnson & Johnson",
-    "eli_lilly": "Eli Lilly",
-    "pfizer": "Pfizer",
-    "exxonmobil": "ExxonMobil",
-    "walmart": "Walmart",
-}
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

@@ -7,18 +7,10 @@ CHROMA_PATH = "./chroma_db"
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 OLLAMA_MODEL = "llama3.1"
 
-SUPPORTED_COMPANIES = {"nvidia", "nvda", "apple", "aapl", "tesla", "tsla"}
-INDEXED_COMPANIES = {"nvidia", "nvda"}
 FINANCIAL_KEYWORDS = {
     "10-k", "risk", "revenue", "filing", "stock",
     "performing", "earnings", "income", "trend",
     "segment", "business", "r&d", "net income"
-}
-
-TICKER_TO_COMPANY = {
-    "nvda": "nvidia",
-    "aapl": "apple",
-    "tsla": "tesla",
 }
 
 SYSTEM_PROMPT = """

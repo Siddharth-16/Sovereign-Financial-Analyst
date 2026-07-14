@@ -1,59 +1,20 @@
 from __future__ import annotations
-
 import os
 import re
 from pathlib import Path
-
 from bs4 import BeautifulSoup
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from app.config import CHROMA_PATH, EMBED_MODEL
+from app.companies import COMPANIES, SECTION_HEADINGS
 
 RAW_DATA_ROOT = Path("data/raw")
 
 COMPANY_METADATA = {
-    "nvidia": {"company": "Nvidia", "ticker": "NVDA"},
-    "microsoft": {"company": "Microsoft", "ticker": "MSFT"},
-    "apple": {"company": "Apple", "ticker": "AAPL"},
-    "amazon": {"company": "Amazon", "ticker": "AMZN"},
-    "alphabet": {"company": "Alphabet", "ticker": "GOOG"},
-    "meta": {"company": "Meta", "ticker": "META"},
-    "amd": {"company": "AMD", "ticker": "AMD"},
-    "broadcom": {"company": "Broadcom", "ticker": "AVGO"},
-    "tesla": {"company": "Tesla", "ticker": "TSLA"},
-    "caterpillar": {"company": "Caterpillar", "ticker": "CAT"},
-    "boeing": {"company": "Boeing", "ticker": "BA"},
-    "general_electric": {"company": "General Electric", "ticker": "GE"},
-    "jpmorgan_chase": {"company": "JPMorgan Chase", "ticker": "JPM"},
-    "goldman_sachs": {"company": "Goldman Sachs", "ticker": "GS"},
-    "visa": {"company": "Visa", "ticker": "V"},
-    "johnson_and_johnson": {"company": "Johnson & Johnson", "ticker": "JNJ"},
-    "eli_lilly": {"company": "Eli Lilly", "ticker": "LLY"},
-    "pfizer": {"company": "Pfizer", "ticker": "PFE"},
-    "exxonmobil": {"company": "ExxonMobil", "ticker": "XOM"},
-    "walmart": {"company": "Walmart", "ticker": "WMT"},
-}
-
-SECTION_HEADINGS = {
-    "business": [
-        "item 1 business",
-    ],
-    "risk_factors": [
-        "item 1a risk factors",
-    ],
-    "mdna": [
-        "item 7 management s discussion and analysis of financial condition and results of operations",
-        "item 7 management discussion and analysis of financial condition and results of operations",
-        "item 7 management s discussion and analysis",
-        "item 7 management discussion and analysis",
-    ],
-    "financial_statements": [
-        "item 8 financial statements and supplementary data",
-        "item 8 financial statements",
-    ],
+    slug: {"company": meta["display"], "ticker": meta["ticker"]}
+    for slug, meta in COMPANIES.items()
 }
 
 if not os.getenv("HF_TOKEN"):

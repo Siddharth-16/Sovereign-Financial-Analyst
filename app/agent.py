@@ -1,8 +1,6 @@
 from typing import Optional
 import re
-
 from langchain_ollama import ChatOllama
-
 from app.tools import (
     get_stock_performance,
     query_financial_reports,
@@ -10,37 +8,12 @@ from app.tools import (
     SLUG_TO_DISPLAY,
     SLUG_TO_TICKER,
 )
-
 from app.config import OLLAMA_MODEL, FINANCIAL_KEYWORDS
+from app.companies import COMPANY_NAME_MAP as COMPANY_ALIASES
 
 llm = ChatOllama(model=OLLAMA_MODEL, temperature=0)
 
 NORMALIZED_TICKER_MAP = {k.lower(): v for k, v in TICKER_TO_COMPANY.items()}
-
-COMPANY_ALIASES = {
-    "nvidia": "nvidia",
-    "apple": "apple",
-    "tesla": "tesla",
-    "microsoft": "microsoft",
-    "amazon": "amazon",
-    "alphabet": "alphabet",
-    "google": "alphabet",
-    "meta": "meta",
-    "amd": "amd",
-    "broadcom": "broadcom",
-    "caterpillar": "caterpillar",
-    "boeing": "boeing",
-    "general electric": "general_electric",
-    "jpmorgan": "jpmorgan_chase",
-    "jpmorgan chase": "jpmorgan_chase",
-    "goldman sachs": "goldman_sachs",
-    "visa": "visa",
-    "johnson & johnson": "johnson_and_johnson",
-    "eli lilly": "eli_lilly",
-    "pfizer": "pfizer",
-    "exxonmobil": "exxonmobil",
-    "walmart": "walmart",
-}
 
 
 def find_tickers(text: str) -> list[str]:

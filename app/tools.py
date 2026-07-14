@@ -1,131 +1,22 @@
 from typing import Optional
 import re
-
 import yfinance as yf
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-
 from app.config import CHROMA_PATH, EMBED_MODEL
+from app.companies import (
+    COMPANY_NAME_MAP,
+    TICKER_TO_SLUG as TICKER_TO_COMPANY,
+    SLUG_TO_DISPLAY,
+    SLUG_TO_TICKER,
+    SECTION_NAME_MAP,
+    SECTION_DISPLAY_MAP,
+)
 
 embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
 db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
 
 INVALID_TICKERS = {"STOCK TICKER", "TICKER", "COMPANY", ""}
-
-COMPANY_NAME_MAP = {
-    "nvidia": "nvidia",
-    "apple": "apple",
-    "tesla": "tesla",
-    "microsoft": "microsoft",
-    "amazon": "amazon",
-    "alphabet": "alphabet",
-    "google": "alphabet",
-    "meta": "meta",
-    "amd": "amd",
-    "broadcom": "broadcom",
-    "caterpillar": "caterpillar",
-    "boeing": "boeing",
-    "general electric": "general_electric",
-    "jpmorgan": "jpmorgan_chase",
-    "jpmorgan chase": "jpmorgan_chase",
-    "goldman sachs": "goldman_sachs",
-    "visa": "visa",
-    "johnson & johnson": "johnson_and_johnson",
-    "eli lilly": "eli_lilly",
-    "pfizer": "pfizer",
-    "exxonmobil": "exxonmobil",
-    "walmart": "walmart",
-}
-
-TICKER_TO_COMPANY = {
-    "NVDA": "nvidia",
-    "AAPL": "apple",
-    "TSLA": "tesla",
-    "MSFT": "microsoft",
-    "AMZN": "amazon",
-    "GOOG": "alphabet",
-    "GOOGL": "alphabet",
-    "META": "meta",
-    "AMD": "amd",
-    "AVGO": "broadcom",
-    "CAT": "caterpillar",
-    "BA": "boeing",
-    "GE": "general_electric",
-    "JPM": "jpmorgan_chase",
-    "GS": "goldman_sachs",
-    "V": "visa",
-    "JNJ": "johnson_and_johnson",
-    "LLY": "eli_lilly",
-    "PFE": "pfizer",
-    "XOM": "exxonmobil",
-    "WMT": "walmart",
-}
-
-SLUG_TO_DISPLAY = {
-    "nvidia": "Nvidia",
-    "apple": "Apple",
-    "tesla": "Tesla",
-    "microsoft": "Microsoft",
-    "amazon": "Amazon",
-    "alphabet": "Alphabet",
-    "meta": "Meta",
-    "amd": "AMD",
-    "broadcom": "Broadcom",
-    "caterpillar": "Caterpillar",
-    "boeing": "Boeing",
-    "general_electric": "General Electric",
-    "jpmorgan_chase": "JPMorgan Chase",
-    "goldman_sachs": "Goldman Sachs",
-    "visa": "Visa",
-    "johnson_and_johnson": "Johnson & Johnson",
-    "eli_lilly": "Eli Lilly",
-    "pfizer": "Pfizer",
-    "exxonmobil": "ExxonMobil",
-    "walmart": "Walmart",
-}
-
-SLUG_TO_TICKER = {
-    "nvidia": "NVDA",
-    "apple": "AAPL",
-    "tesla": "TSLA",
-    "microsoft": "MSFT",
-    "amazon": "AMZN",
-    "alphabet": "GOOG",
-    "meta": "META",
-    "amd": "AMD",
-    "broadcom": "AVGO",
-    "caterpillar": "CAT",
-    "boeing": "BA",
-    "general_electric": "GE",
-    "jpmorgan_chase": "JPM",
-    "goldman_sachs": "GS",
-    "visa": "V",
-    "johnson_and_johnson": "JNJ",
-    "eli_lilly": "LLY",
-    "pfizer": "PFE",
-    "exxonmobil": "XOM",
-    "walmart": "WMT",
-}
-
-SECTION_NAME_MAP = {
-    "business": "business",
-    "risk_factors": "risk_factors",
-    "risks": "risk_factors",
-    "risk": "risk_factors",
-    "mdna": "mdna",
-    "mda": "mdna",
-    "management_discussion": "mdna",
-    "financial_statements": "financial_statements",
-    "financials": "financial_statements",
-}
-
-SECTION_DISPLAY_MAP = {
-    "business": "Business",
-    "risk_factors": "Risk Factors",
-    "mdna": "MD&A",
-    "financial_statements": "Financial Statements",
-    "full_filing": "Full Filing",
-}
 
 
 def normalize_section(section: Optional[str]) -> Optional[str]:
