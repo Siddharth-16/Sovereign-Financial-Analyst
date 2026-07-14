@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import json
 import os
 import re
@@ -8,6 +9,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from sec_api import QueryApi, RenderApi
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.companies import SLUG_TO_TICKER, TARGET_FISCAL_YEARS
 
 load_dotenv()

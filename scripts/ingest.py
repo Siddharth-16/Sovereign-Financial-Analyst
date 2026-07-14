@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import sys
 import re
 from pathlib import Path
 from bs4 import BeautifulSoup
@@ -7,6 +8,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.config import CHROMA_PATH, EMBED_MODEL
 from app.companies import COMPANIES, SECTION_HEADINGS
 
