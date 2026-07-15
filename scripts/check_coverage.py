@@ -10,7 +10,6 @@ from app.companies import COMPANIES, TARGET_FISCAL_YEARS, REQUIRED_SECTIONS
 
 
 def load_indexed_metadata(batch_size: int = 500) -> list[dict]:
-    """Pull every chunk's metadata out of the persisted Chroma collection."""
     embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
 
@@ -27,9 +26,14 @@ def load_indexed_metadata(batch_size: int = 500) -> list[dict]:
     return all_metadatas
 
 
-def build_coverage_map(metadatas: list[dict]) -> dict[tuple[str, int], set[str]]:
-    """(company_slug, fiscal_year) -> set of section names actually indexed."""
+def build_coverage_map(metadatas: list[dict]) -> tuple[dict[tuple[str, int], set[str]], set[tuple[str, int]]]:
+    """Returns (coverage, amended_combos). amended_combos are (slug, fy)
+    pairs where at least one indexed chunk came from a 10-K/A -- these are
+    reported separately, not folded into the pass/fail coverage count,
+    since a Part III-only amendment was never going to contain the four
+    core sections."""
     coverage: dict[tuple[str, int], set[str]] = defaultdict(set)
+    amended_combos: set[tuple[str, int]] = set()
 
     for md in metadatas:
         slug = md.get("company_slug")
@@ -39,9 +43,14 @@ def build_coverage_map(metadatas: list[dict]) -> dict[tuple[str, int], set[str]]
         if slug is None or fiscal_year is None or section is None:
             continue
 
-        coverage[(slug, int(fiscal_year))].add(section)
+        key = (slug, int(fiscal_year))
+        if md.get("is_amendment") or section == "amendment_supplement":
+            amended_combos.add(key)
+            continue
 
-    return coverage
+        coverage[key].add(section)
+
+    return coverage, amended_combos
 
 
 def main() -> int:
@@ -53,7 +62,7 @@ def main() -> int:
               "(python scripts/ingest.py)")
         return 1
 
-    coverage = build_coverage_map(metadatas)
+    coverage, amended_combos = build_coverage_map(metadatas)
 
     expected_combos = [
         (slug, fy)
@@ -61,15 +70,19 @@ def main() -> int:
         for fy in sorted(TARGET_FISCAL_YEARS)
     ]
 
-    missing_entirely: list[tuple[str, int]] = []       # no chunks at all
-    fell_back_to_full_filing: list[tuple[str, int]] = []  # split silently failed
-    partial_sections: list[tuple[str, int, set[str]]] = []  # some sections missing
+    missing_entirely: list[tuple[str, int]] = []
+    fell_back_to_full_filing: list[tuple[str, int]] = []
+    partial_sections: list[tuple[str, int, set[str]]] = []
+    amendment_only: list[tuple[str, int]] = []
 
     for slug, fy in expected_combos:
         sections_found = coverage.get((slug, fy))
 
         if not sections_found:
-            missing_entirely.append((slug, fy))
+            if (slug, fy) in amended_combos:
+                amendment_only.append((slug, fy))
+            else:
+                missing_entirely.append((slug, fy))
             continue
 
         if sections_found == {"full_filing"}:
@@ -81,7 +94,7 @@ def main() -> int:
             partial_sections.append((slug, fy, missing_sections))
 
     total = len(expected_combos)
-    fully_covered = total - len(missing_entirely) - len(fell_back_to_full_filing) - len(partial_sections)
+    fully_covered = total - len(missing_entirely) - len(fell_back_to_full_filing) - len(partial_sections) - len(amendment_only)
 
     print("\n" + "=" * 72)
     print("COVERAGE REPORT")
@@ -106,6 +119,14 @@ def main() -> int:
         print(f"\nPartially indexed — some sections missing ({len(partial_sections)}):")
         for slug, fy, missing in partial_sections:
             print(f"  - {slug} FY{fy}: missing {sorted(missing)}")
+
+    if amendment_only:
+        print(f"\nOnly a 10-K/A amendment is indexed for these — a Part III-only "
+              f"amendment cannot contain Business/Risk Factors/MD&A/Financial "
+              f"Statements by design ({len(amendment_only)}). Download the "
+              f"ORIGINAL 10-K for these if you need full section coverage:")
+        for slug, fy in amendment_only:
+            print(f"  - {slug} FY{fy}")
 
     print("=" * 72)
 

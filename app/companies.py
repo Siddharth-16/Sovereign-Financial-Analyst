@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 
 ''' slug -> {display name, primary ticker, extra name aliases a user might type}
 The slug is what's stored in Chroma metadata (company_slug) and used as the
@@ -29,17 +30,12 @@ COMPANIES: dict[str, dict] = {
 
 TARGET_FISCAL_YEARS: set[int] = {2023, 2024, 2025}
 
-# slug -> display name, e.g. "jpmorgan_chase" -> "JPMorgan Chase"
 SLUG_TO_DISPLAY: dict[str, str] = {
     slug: meta["display"] for slug, meta in COMPANIES.items()
 }
-
-# slug -> primary ticker, e.g. "nvidia" -> "NVDA"
 SLUG_TO_TICKER: dict[str, str] = {
     slug: meta["ticker"] for slug, meta in COMPANIES.items()
 }
-
-# UPPERCASE ticker -> slug, e.g. "NVDA" -> "nvidia", "GOOGL" -> "alphabet"
 TICKER_TO_SLUG: dict[str, str] = {}
 for _slug, _meta in COMPANIES.items():
     TICKER_TO_SLUG[_meta["ticker"].upper()] = _slug
@@ -47,8 +43,6 @@ for _slug, _meta in COMPANIES.items():
         TICKER_TO_SLUG[_extra_ticker.upper()] = _slug
 del _slug, _meta, _extra_ticker
 
-# lowercase name/alias -> slug, e.g. "jpmorgan chase" -> "jpmorgan_chase",
-# "google" -> "alphabet". Built from the display name plus any extra aliases.
 COMPANY_NAME_MAP: dict[str, str] = {}
 for _slug, _meta in COMPANIES.items():
     _display_lower = _meta["display"].lower()
@@ -56,34 +50,36 @@ for _slug, _meta in COMPANIES.items():
     COMPANY_NAME_MAP[_slug.replace("_", " ")] = _slug
     for _alias in _meta["aliases"]:
         COMPANY_NAME_MAP[_alias.lower()] = _slug
-del _slug, _meta, _display_lower, _alias  
+del _slug, _meta, _display_lower, _alias
 
-# The set of companies actually supported/indexed by the system.
 INDEXED_COMPANIES: set[str] = set(COMPANIES.keys())
 SUPPORTED_COMPANIES: set[str] = INDEXED_COMPANIES
 
-
-# Section registry (used by ingest.py's heading matcher and the coverage check)
-SECTION_HEADINGS: dict[str, list[str]] = {
-    "business": [
-        "item 1 business",
-    ],
-    "risk_factors": [
-        "item 1a risk factors",
-    ],
-    "mdna": [
-        "item 7 management s discussion and analysis of financial condition and results of operations",
-        "item 7 management discussion and analysis of financial condition and results of operations",
-        "item 7 management s discussion and analysis",
-        "item 7 management discussion and analysis",
-    ],
-    "financial_statements": [
-        "item 8 financial statements and supplementary data",
-        "item 8 financial statements",
-    ],
+SECTION_PATTERNS_ITEM: dict[str, re.Pattern] = {
+    "business":              re.compile(r"^item\s*1\.?\s*[-\u2014.]?\s*business\b", re.I),
+    "risk_factors":          re.compile(r"^item\s*1a\.?\s*[-\u2014.]?\s*risk\s*factors\b", re.I),
+    "mdna":                  re.compile(r"^item\s*7\.?\s*[-\u2014.]?\s*management.{0,3}s?\s*discussion", re.I),
+    "financial_statements":  re.compile(r"^item\s*8\.?\s*[-\u2014.]?\s*financial\s*statements", re.I),
 }
 
-REQUIRED_SECTIONS: set[str] = set(SECTION_HEADINGS.keys())
+SECTION_PATTERNS_NARRATIVE: dict[str, re.Pattern] = {
+    "business":              re.compile(r"^(about\s+[a-z .,&]+|business)\s*$", re.I),
+    "risk_factors":          re.compile(r"^risk\s*factors\s*$", re.I),
+    "mdna":                  re.compile(r"^management.{0,3}s?\s*discussion\s*and\s*analysis\b", re.I),
+    "financial_statements":  re.compile(
+        r"^(audited\s+)?(consolidated\s+)?financial\s*statements(\s+and\s+(supplementary\s+)?notes)?\s*$",
+        re.I,
+    ),
+}
+
+SECTION_HEADINGS: dict[str, list[str]] = {
+    "business": ["item 1 business"],
+    "risk_factors": ["item 1a risk factors"],
+    "mdna": ["item 7 management s discussion and analysis of financial condition and results of operations"],
+    "financial_statements": ["item 8 financial statements and supplementary data"],
+}
+
+REQUIRED_SECTIONS: set[str] = set(SECTION_PATTERNS_ITEM.keys())
 
 SECTION_DISPLAY_MAP: dict[str, str] = {
     "business": "Business",
@@ -91,6 +87,7 @@ SECTION_DISPLAY_MAP: dict[str, str] = {
     "mdna": "MD&A",
     "financial_statements": "Financial Statements",
     "full_filing": "Full Filing",
+    "amendment_supplement": "Amendment Supplement (non-core Items)",
 }
 
 SECTION_NAME_MAP: dict[str, str] = {
