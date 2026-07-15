@@ -69,9 +69,11 @@ def get_stock_performance(ticker: str) -> dict:
         }
 
     hist = yf.Ticker(ticker).history(period="5d")
+    hist = hist.dropna(subset=["Close"])
+
     if hist.empty:
         return {
-            "error": f"No stock data found for '{ticker}'.",
+            "error": "No valid stock data available.",
             "citation": None,
         }
 
@@ -155,4 +157,3 @@ def query_financial_reports(
         "content": "\n\n".join(cleaned_chunks),
         "citations": citations,
     }
-    
