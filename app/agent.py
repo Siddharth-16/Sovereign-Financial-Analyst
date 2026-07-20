@@ -15,6 +15,20 @@ llm = ChatOllama(model=OLLAMA_MODEL, temperature=0)
 
 NORMALIZED_TICKER_MAP = {k.lower(): v for k, v in TICKER_TO_COMPANY.items()}
 
+def invoke_llm_with_retry(messages: list[dict], retries: int = 2, backoff_seconds: float = 1.5) -> str:
+    import time as _time
+
+    last_exc: Optional[Exception] = None
+    for attempt in range(retries + 1):
+        try:
+            response = llm.invoke(messages)
+            return response.content if hasattr(response, "content") else str(response)
+        except Exception as exc:  
+            last_exc = exc
+            if attempt < retries:
+                _time.sleep(backoff_seconds)
+    raise last_exc
+
 
 def find_tickers(text: str) -> list[str]:
     lowered = text.lower()
@@ -147,9 +161,37 @@ def infer_needs(user_input: str) -> tuple[bool, bool]:
 def infer_section(user_input: str) -> Optional[str]:
     lowered = user_input.lower()
 
+    strong_signals: list[tuple[str, set[str]]] = [
+        ("risk_factors", {
+            "risk factors", "risk factor", "regulatory risk",
+            "supply chain risk", "export risk", "geopolitical risk",
+        }),
+        ("financial_statements", {
+            "financial statements", "balance sheet", "income statement",
+            "cash flow statement",
+        }),
+        ("mdna", {
+            "md&a", "mdna", "management's discussion", "managements discussion",
+            "management discussion and analysis", "results of operations",
+        }),
+        ("business", {
+            "business segment", "business segments", "business model",
+            "revenue model", "reportable segment", "reportable segments",
+        }),
+    ]
+
+    for section, phrases in strong_signals:
+        if any(p in lowered for p in phrases):
+            return section
+
     risk_keywords = {
         "risk", "risks", "risk factors", "regulatory risk",
         "supply chain risk", "export risk", "geopolitical risk"
+    }
+
+    financial_keywords = {
+        "balance sheet", "income statement", "financial statements",
+        "financials", "assets", "liabilities"
     }
 
     mdna_keywords = {
@@ -164,22 +206,17 @@ def infer_section(user_input: str) -> Optional[str]:
         "strategic priorities", "market position"
     }
 
-    financial_keywords = {
-        "balance sheet", "income statement", "financial statements",
-        "financials", "assets", "liabilities"
-    }
-
     if any(k in lowered for k in risk_keywords):
         return "risk_factors"
+    
+    if any(k in lowered for k in financial_keywords):
+        return "financial_statements"
 
     if any(k in lowered for k in mdna_keywords):
         return "mdna"
 
     if any(k in lowered for k in business_keywords):
         return "business"
-
-    if any(k in lowered for k in financial_keywords):
-        return "financial_statements"
 
     return None
 
@@ -208,6 +245,7 @@ Rules:
 - If filing data is unavailable, state that directly.
 - If stock data is unavailable, state that directly.
 - Do not invent facts beyond the provided context.
+- Do not add general industry knowledge, common risk factors, or typical practices for this sector unless they are explicitly stated in the provided context, even if they sound plausible for a company like this. Every specific claim must trace back to something in the context below.
 - Ignore irrelevant or conflicting details from unrelated companies.
 - For business segment questions, prefer formal reportable segments named in the filing.
 - For revenue trend questions, prefer total company revenue and overall year-over-year trend.
@@ -241,13 +279,12 @@ Stock citation:
 
 Write the final answer for the user.
 """
-    response = llm.invoke(
-        [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-    )
-    return response.content if hasattr(response, "content") else str(response)
+    return invoke_llm_with_retry(
+         [
+             {"role": "system", "content": system_prompt},
+             {"role": "user", "content": user_prompt},
+         ]
+     )
 
 def build_comparison_answer(
     user_input: str,
@@ -275,6 +312,7 @@ Rules:
 - Give 2–3 similarities and 2–3 differences at most.
 - Keep the full comparison under 8 sentences total, excluding the Sources section.
 - Do not invent facts beyond the provided context.
+- Do not add general industry knowledge or typical practices for this sector unless explicitly stated in the provided context, even if plausible. Every specific claim must trace back to the context below.
 - Do not add extra commentary or conclusions unless directly supported by the context.
 - End the answer with a short "Sources:" section when source information is available.
 - In the Sources section, use only the provided citation labels.
@@ -311,14 +349,12 @@ Citations B:
 
 Write a comparison answer for the user.
 """
-    response = llm.invoke(
-        [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-    )
-    return response.content if hasattr(response, "content") else str(response)
-
+    return invoke_llm_with_retry(
+         [
+             {"role": "system", "content": system_prompt},
+             {"role": "user", "content": user_prompt},
+         ]
+     )
 
 def ask_agent(
     user_input: str,

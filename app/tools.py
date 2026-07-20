@@ -13,7 +13,7 @@ from app.companies import (
     SECTION_DISPLAY_MAP,
 )
 
-embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL, model_kwargs={"device": "cpu"},)
 db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
 
 INVALID_TICKERS = {"STOCK TICKER", "TICKER", "COMPANY", ""}
@@ -95,6 +95,7 @@ def query_financial_reports(
     company: str,
     fiscal_year: Optional[int] = None,
     section: Optional[str] = None,
+    k: int = 4,
 ) -> dict:
     """
     Search local 10-K filings for a specific company.
@@ -112,7 +113,7 @@ def query_financial_reports(
         conditions.append({"section": section_slug})
 
     filter_dict = conditions[0] if len(conditions) == 1 else {"$and": conditions}
-    docs = db.similarity_search(query, k=4, filter=filter_dict)
+    docs = db.similarity_search(query, k=k, filter=filter_dict)
 
     display = SLUG_TO_DISPLAY.get(company_slug, company_slug)
 
