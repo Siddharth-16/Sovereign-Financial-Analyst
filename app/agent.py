@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 import re
 from langchain_ollama import ChatOllama
 from app.tools import (
@@ -10,6 +11,9 @@ from app.tools import (
 )
 from app.config import OLLAMA_MODEL, FINANCIAL_KEYWORDS
 from app.companies import COMPANY_NAME_MAP as COMPANY_ALIASES
+from app.exceptions import OllamaUnavailableError
+
+logger = logging.getLogger("sovereign_fa.agent")
 
 llm = ChatOllama(model=OLLAMA_MODEL, temperature=0)
 
@@ -23,11 +27,15 @@ def invoke_llm_with_retry(messages: list[dict], retries: int = 2, backoff_second
         try:
             response = llm.invoke(messages)
             return response.content if hasattr(response, "content") else str(response)
-        except Exception as exc:  
+        except Exception as exc:
             last_exc = exc
+            logger.warning(
+                "ollama_invoke_failed",
+                extra={"attempt": attempt, "retries": retries, "error": str(exc)},
+            )
             if attempt < retries:
                 _time.sleep(backoff_seconds)
-    raise last_exc
+    raise OllamaUnavailableError(str(last_exc)) from last_exc
 
 
 def find_tickers(text: str) -> list[str]:
