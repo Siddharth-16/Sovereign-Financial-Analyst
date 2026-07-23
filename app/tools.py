@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 import re
 import yfinance as yf
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -12,11 +13,46 @@ from app.companies import (
     SECTION_NAME_MAP,
     SECTION_DISPLAY_MAP,
 )
+from app.exceptions import VectorStoreUnavailableError
 
-embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL, model_kwargs={"device": "cpu"},)
-db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+logger = logging.getLogger("sovereign_fa.tools")
 
 INVALID_TICKERS = {"STOCK TICKER", "TICKER", "COMPANY", ""}
+
+_embeddings: Optional[HuggingFaceEmbeddings] = None
+_vectorstore: Optional[Chroma] = None
+
+
+def get_embeddings() -> HuggingFaceEmbeddings:
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = HuggingFaceEmbeddings(
+            model_name=EMBED_MODEL, model_kwargs={"device": "cpu"}
+        )
+    return _embeddings
+
+
+def get_vectorstore() -> Chroma:
+    global _vectorstore
+    if _vectorstore is None:
+        try:
+            _vectorstore = Chroma(
+                persist_directory=CHROMA_PATH, embedding_function=get_embeddings()
+            )
+        except Exception as exc:
+            logger.error("vector_store_init_failed", extra={"error": str(exc)})
+            raise VectorStoreUnavailableError(
+                f"Could not initialize Chroma at '{CHROMA_PATH}': {exc}"
+            ) from exc
+    return _vectorstore
+
+
+def reset_vectorstore_cache() -> None:
+    """Test-only helper: clears the cached singletons so a fresh (possibly
+    mocked) vector store / embeddings model gets built on next use."""
+    global _embeddings, _vectorstore
+    _embeddings = None
+    _vectorstore = None
 
 
 def normalize_section(section: Optional[str]) -> Optional[str]:
@@ -60,6 +96,16 @@ def format_stock_citation(ticker: str) -> str:
 
 
 def get_stock_performance(ticker: str) -> dict:
+    """
+    Fetch latest 5-day price/volume data for a ticker.
+
+    Failure modes are handled gracefully (returned as {"error": ...} rather
+    than raised) so callers like app.agent.ask_agent and the LLM-driven
+    agentic tool loop can synthesize an honest "stock data unavailable"
+    sentence instead of crashing the whole request over a flaky market-data
+    provider. This covers yfinance network errors, timeouts, and rate
+    limiting, none of which were previously caught.
+    """
     ticker = ticker.strip().upper()
 
     if ticker in INVALID_TICKERS:
@@ -68,7 +114,21 @@ def get_stock_performance(ticker: str) -> dict:
             "citation": None,
         }
 
-    hist = yf.Ticker(ticker).history(period="5d")
+    try:
+        hist = yf.Ticker(ticker).history(period="5d")
+    except Exception as exc:
+        logger.warning(
+            "stock_fetch_failed",
+            extra={"ticker": ticker, "error": str(exc)},
+        )
+        return {
+            "error": (
+                f"Could not fetch stock data for '{ticker}' right now "
+                "(the market data provider timed out or rate-limited the request)."
+            ),
+            "citation": None,
+        }
+
     hist = hist.dropna(subset=["Close"])
 
     if hist.empty:
@@ -113,7 +173,17 @@ def query_financial_reports(
         conditions.append({"section": section_slug})
 
     filter_dict = conditions[0] if len(conditions) == 1 else {"$and": conditions}
-    docs = db.similarity_search(query, k=k, filter=filter_dict)
+
+    try:
+        docs = get_vectorstore().similarity_search(query, k=k, filter=filter_dict)
+    except VectorStoreUnavailableError:
+        raise
+    except Exception as exc:
+        logger.error(
+            "similarity_search_failed",
+            extra={"company_slug": company_slug, "error": str(exc)},
+        )
+        raise VectorStoreUnavailableError(str(exc)) from exc
 
     display = SLUG_TO_DISPLAY.get(company_slug, company_slug)
 
