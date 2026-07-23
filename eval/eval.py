@@ -49,7 +49,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from app.agent import extract_company, infer_section, ask_agent, llm  
-from app.tools import query_financial_reports 
+from app.agentic_router import run_agentic_query
+from app.tools import query_financial_reports, normalize_company 
 from app.companies import SLUG_TO_DISPLAY, SECTION_DISPLAY_MAP  
 
 from dataset import EVAL_QUESTIONS  
@@ -83,6 +84,7 @@ class QuestionResult:
 
     answer: str = ""
     latency_sec: float = 0.0
+    tool_calls_count: int = 0  # agentic mode only; always 0 for rule_based
 
 
 # --------------------------------------------------------------------- retrieval
@@ -135,6 +137,98 @@ def evaluate_retrieval(item: dict, k: int) -> QuestionResult:
         result.retrieval_note = "no chunks retrieved under routed filter (possible coverage gap)"
     elif not hit:
         result.retrieval_note = "retrieved chunks did not match expected company/section"
+
+    return result
+
+
+# --------------------------------------------------------------------- agentic
+
+
+def evaluate_agentic(item: dict, k: int, run_groundedness: bool) -> QuestionResult:
+    result = QuestionResult(
+        id=item["id"],
+        question=item["question"],
+        category=item["category"],
+        expected_company=item["expected_company"],
+        expected_section=item["expected_section"],
+    )
+
+    start = time.time()
+    try:
+        agentic_result = run_agentic_query(item["question"])
+    except Exception as exc:  
+        result.answer = ""
+        result.judge_error = f"run_agentic_query raised: {exc!r}"
+        result.groundedness_run = run_groundedness
+        result.latency_sec = time.time() - start
+        result.retrieval_note = "agentic call failed; no retrieval attempted"
+        return result
+
+    result.answer = agentic_result["answer"]
+    result.latency_sec = time.time() - start
+    result.tool_calls_count = len(agentic_result["tools_invoked"])
+
+    search_calls = [t for t in agentic_result["tools_invoked"] if t["tool"] == "search_filing"]
+
+    if not search_calls:
+        result.retrieval_note = "agent made no search_filing call; no retrieval attempted"
+        return result
+
+    first_call = search_calls[0]
+    routed_company = normalize_company(first_call["args"].get("company"))
+    routed_section = first_call["args"].get("section")
+
+    result.routed_company = routed_company
+    result.routed_section = routed_section
+    result.routing_company_correct = routed_company == item["expected_company"]
+    result.routing_section_correct = (
+        routed_section == item["expected_section"] if routed_section else False
+    )
+
+    # Pull citations + retrieved text straight from the tool result already
+    # produced during the agent's own run -- no second retrieval call needed.
+    citations: list[str] = []
+    context_parts: list[str] = []
+    for call in search_calls:
+        try:
+            parsed = json.loads(call["result"])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        citations.extend(parsed.get("citations", []))
+        content = parsed.get("content", "")
+        if content:
+            context_parts.append(content)
+
+    result.retrieval_citations = citations
+
+    expected_company_display = SLUG_TO_DISPLAY.get(item["expected_company"], item["expected_company"])
+    expected_section_display = SECTION_DISPLAY_MAP.get(item["expected_section"], item["expected_section"])
+
+    hit = any(
+        expected_company_display.lower() in c.lower() and expected_section_display.lower() in c.lower()
+        for c in citations
+    )
+    result.retrieval_hit = hit
+
+    if not citations:
+        result.retrieval_note = "no citations returned by the agent's tool call(s)"
+    elif not hit:
+        result.retrieval_note = "retrieved chunks did not match expected company/section"
+
+    if run_groundedness:
+        context = "\n\n".join(context_parts)
+        try:
+            verdict = judge_groundedness(item["question"], context, result.answer)
+        except Exception as exc:  
+            result.groundedness_run = True
+            result.judge_error = f"judge call raised: {exc!r}"
+            return result
+
+        result.groundedness_run = True
+        result.grounded = verdict["grounded"]
+        result.unsupported_claims = verdict["unsupported_claims"]
+        result.judge_reasoning = verdict["reasoning"]
+        result.judge_error = verdict["error"]
 
     return result
 
@@ -208,13 +302,6 @@ Return the JSON verdict now.
 
 
 def evaluate_groundedness(item: dict, result: QuestionResult) -> None:
-    """Runs the *actual* agent end-to-end (ask_agent), then re-derives the
-    context it would have retrieved via the same routing decision, and asks
-    the judge model whether the final answer is grounded in that context.
-
-    Every external call (agent inference, retrieval, judge inference) is
-    individually wrapped -- a single crashed/OOM'd Ollama call should not
-    take down the whole batch. Failures are recorded per-question instead."""
     start = time.time()
     try:
         answer, _ = ask_agent(item["question"])
@@ -274,6 +361,9 @@ def summarize(results: list[QuestionResult]) -> dict:
     grounded_count = sum(1 for r in graded if r.grounded)
     judge_errors = sum(1 for r in results if r.judge_error)
 
+    total_tool_calls = sum(r.tool_calls_count for r in results)
+    zero_tool_call_questions = sum(1 for r in results if r.tool_calls_count == 0)
+
     by_category: dict[str, dict] = {}
     for r in results:
         cat = by_category.setdefault(
@@ -298,6 +388,8 @@ def summarize(results: list[QuestionResult]) -> dict:
         "groundedness_graded": len(graded),
         "groundedness_score": round(grounded_count / len(graded), 3) if graded else None,
         "judge_errors": judge_errors,
+        "avg_tool_calls_per_question": round(total_tool_calls / total, 3) if total else 0.0,
+        "questions_with_zero_tool_calls": zero_tool_call_questions,
         "by_category": {
             cat: {
                 "total": v["total"],
@@ -352,54 +444,73 @@ def write_markdown_report(path: Path, summary: dict, results: list[QuestionResul
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def print_comparison(summary_rb: dict, summary_ag: dict) -> None:
+    print("\n" + "=" * 72)
+    print("RULE_BASED vs AGENTIC")
+    print("=" * 72)
+    rows = [
+        ("Retrieval recall@k", summary_rb["retrieval_recall_at_k"], summary_ag["retrieval_recall_at_k"]),
+        ("Company routing accuracy", summary_rb["routing_company_accuracy"], summary_ag["routing_company_accuracy"]),
+        ("Groundedness", summary_rb["groundedness_score"], summary_ag["groundedness_score"]),
+    ]
+    for label, rb, ag in rows:
+        rb_s = f"{rb * 100:.1f}%" if rb is not None else "n/a"
+        ag_s = f"{ag * 100:.1f}%" if ag is not None else "n/a"
+        print(f"{label:<28} rule_based: {rb_s:<8} agentic: {ag_s}")
+    print(f"{'Avg tool calls/question':<28} rule_based: n/a       agentic: {summary_ag['avg_tool_calls_per_question']}")
+    print("=" * 72)
+
+
+def write_comparison_report(path: Path, summary_rb: dict, summary_ag: dict) -> None:
+    lines = ["# Sovereign Financial Analyst -- rule_based vs agentic\n"]
+    lines.append("| Metric | rule_based | agentic |")
+    lines.append("|---|---|---|")
+
+    def fmt(v: Optional[float]) -> str:
+        return f"{v * 100:.1f}%" if v is not None else "n/a"
+
+    lines.append(f"| Retrieval recall@k | {fmt(summary_rb['retrieval_recall_at_k'])} | {fmt(summary_ag['retrieval_recall_at_k'])} |")
+    lines.append(f"| Company routing accuracy | {fmt(summary_rb['routing_company_accuracy'])} | {fmt(summary_ag['routing_company_accuracy'])} |")
+    lines.append(f"| Section routing accuracy | {fmt(summary_rb['routing_section_accuracy'])} | {fmt(summary_ag['routing_section_accuracy'])} |")
+    lines.append(f"| Groundedness | {fmt(summary_rb['groundedness_score'])} | {fmt(summary_ag['groundedness_score'])} |")
+    lines.append(f"| Avg tool calls / question | n/a | {summary_ag['avg_tool_calls_per_question']} |")
+    lines.append(f"| Questions with zero tool calls | n/a | {summary_ag['questions_with_zero_tool_calls']} |")
+    lines.append("")
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 # -------------------------------------------------------------------------- main
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Phase 1 eval harness for Sovereign Financial Analyst")
-    parser.add_argument("--category", choices=["business", "risk_factors", "mdna", "financial_statements"],
-                         help="only run questions from this section")
-    parser.add_argument("--limit", type=int, default=None, help="only run the first N questions (after filtering)")
-    parser.add_argument("--k", type=int, default=4, help="retrieval k (default matches app.tools default of 4)")
-    parser.add_argument("--skip-groundedness", action="store_true",
-                         help="skip the LLM-as-judge pass; retrieval metrics only (much faster)")
-    parser.add_argument("--sleep", type=float, default=0.0,
-                         help="seconds to pause between questions (helps if Ollama/GPU backend is unstable "
-                              "under back-to-back calls, e.g. macOS Metal OOM crashes)")
-    parser.add_argument("--out", type=str, default=str(REPO_ROOT / "eval" / "report.json"),
-                         help="path to write the JSON report")
-    parser.add_argument("--md-out", type=str, default=str(REPO_ROOT / "eval" / "report.md"),
-                         help="path to write the Markdown report")
-    args = parser.parse_args()
-
-    questions = EVAL_QUESTIONS
-    if args.category:
-        questions = [q for q in questions if q["category"] == args.category]
-    if args.limit:
-        questions = questions[: args.limit]
-
-    if not questions:
-        print("No questions match the given filters.")
-        return 1
-
-    print(f"Running Phase 1 eval on {len(questions)} question(s)"
+def run_eval(questions: list[dict], mode: str, args: argparse.Namespace, out_path: Path, md_path: Path) -> dict:
+    """Runs one full pass (either mode) over `questions`, checkpointing and
+    reporting to the given paths. Returns the summary dict."""
+    label = "Phase 1 eval" if mode == "rule_based" else "Phase 2 agentic eval"
+    print(f"\nRunning {label} ({mode}) on {len(questions)} question(s)"
           f"{' (retrieval only)' if args.skip_groundedness else ''} ...\n")
 
-    out_path = Path(args.out)
-    md_path = Path(args.md_out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     results: list[QuestionResult] = []
     for i, item in enumerate(questions, start=1):
         print(f"[{i}/{len(questions)}] {item['id']}: {item['question']}")
-        result = evaluate_retrieval(item, k=args.k)
 
-        status = "HIT " if result.retrieval_hit else "MISS"
-        print(f"    routing -> company={result.routed_company} section={result.routed_section} "
-              f"| retrieval {status}")
-
-        if not args.skip_groundedness:
-            evaluate_groundedness(item, result)
+        if mode == "rule_based":
+            result = evaluate_retrieval(item, k=args.k)
+            status = "HIT " if result.retrieval_hit else "MISS"
+            print(f"    routing -> company={result.routed_company} section={result.routed_section} "
+                  f"| retrieval {status}")
+            if not args.skip_groundedness:
+                evaluate_groundedness(item, result)
+                if result.grounded is not None:
+                    print(f"    groundedness -> {'GROUNDED' if result.grounded else 'NOT GROUNDED'}")
+                elif result.judge_error:
+                    print(f"    groundedness -> judge error: {result.judge_error}")
+        else:  # agentic
+            result = evaluate_agentic(item, k=args.k, run_groundedness=not args.skip_groundedness)
+            status = "HIT " if result.retrieval_hit else "MISS"
+            print(f"    agent routed -> company={result.routed_company} section={result.routed_section} "
+                  f"| tool_calls={result.tool_calls_count} | retrieval {status}")
             if result.grounded is not None:
                 print(f"    groundedness -> {'GROUNDED' if result.grounded else 'NOT GROUNDED'}")
             elif result.judge_error:
@@ -412,7 +523,7 @@ def main() -> int:
         # to that point on disk instead of losing the whole run.
         partial_summary = summarize(results)
         out_path.write_text(
-            json.dumps({"summary": partial_summary, "results": [asdict(r) for r in results],
+            json.dumps({"mode": mode, "summary": partial_summary, "results": [asdict(r) for r in results],
                         "status": "in_progress" if i < len(questions) else "complete"}, indent=2),
             encoding="utf-8",
         )
@@ -423,7 +534,7 @@ def main() -> int:
     summary = summarize(results)
 
     print("\n" + "=" * 72)
-    print("SUMMARY")
+    print(f"SUMMARY ({mode})")
     print("=" * 72)
     print(f"Retrieval recall@k:        {summary['retrieval_recall_at_k'] * 100:.1f}% "
           f"({summary['retrieval_hits']}/{summary['total_questions']})")
@@ -434,12 +545,68 @@ def main() -> int:
               f"({summary['groundedness_graded']} graded, {summary['judge_errors']} judge errors)")
     else:
         print("Groundedness score:        not run")
+    if mode == "agentic":
+        print(f"Avg tool calls/question:   {summary['avg_tool_calls_per_question']}")
     print("=" * 72)
     print(f"\nJSON report written to {out_path}")
 
     write_markdown_report(md_path, summary, results)
     print(f"Markdown report written to {md_path}")
 
+    return summary
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Eval harness for Sovereign Financial Analyst")
+    parser.add_argument("--mode", choices=["rule_based", "agentic", "both"], default="rule_based",
+                         help="which routing strategy to evaluate. 'rule_based' (default) preserves the "
+                              "original Phase 1 behavior and default file paths. 'agentic' runs the LLM "
+                              "tool-calling router instead. 'both' runs each in turn and prints/writes a "
+                              "head-to-head comparison.")
+    parser.add_argument("--category", choices=["business", "risk_factors", "mdna", "financial_statements"],
+                         help="only run questions from this section")
+    parser.add_argument("--limit", type=int, default=None, help="only run the first N questions (after filtering)")
+    parser.add_argument("--k", type=int, default=4, help="retrieval k (default matches app.tools default of 4)")
+    parser.add_argument("--skip-groundedness", action="store_true",
+                         help="skip the LLM-as-judge pass; retrieval metrics only (much faster)")
+    parser.add_argument("--sleep", type=float, default=0.0,
+                         help="seconds to pause between questions (helps if Ollama/GPU backend is unstable "
+                              "under back-to-back calls, e.g. macOS Metal OOM crashes)")
+    parser.add_argument("--out", type=str, default=None,
+                         help="path to write the JSON report (single-mode runs only; ignored for --mode both, "
+                              "defaults to eval/report.json for rule_based, eval/report_agentic.json for agentic)")
+    parser.add_argument("--md-out", type=str, default=None,
+                         help="path to write the Markdown report (single-mode runs only; same default rule as --out)")
+    args = parser.parse_args()
+
+    questions = EVAL_QUESTIONS
+    if args.category:
+        questions = [q for q in questions if q["category"] == args.category]
+    if args.limit:
+        questions = questions[: args.limit]
+
+    if not questions:
+        print("No questions match the given filters.")
+        return 1
+
+    default_paths = {
+        "rule_based": (REPO_ROOT / "eval" / "report.json", REPO_ROOT / "eval" / "report.md"),
+        "agentic": (REPO_ROOT / "eval" / "report_agentic.json", REPO_ROOT / "eval" / "report_agentic.md"),
+    }
+
+    if args.mode == "both":
+        summary_rb = run_eval(questions, "rule_based", args, *default_paths["rule_based"])
+        summary_ag = run_eval(questions, "agentic", args, *default_paths["agentic"])
+        print_comparison(summary_rb, summary_ag)
+        comparison_path = REPO_ROOT / "eval" / "comparison.md"
+        write_comparison_report(comparison_path, summary_rb, summary_ag)
+        print(f"\nComparison report written to {comparison_path}")
+        return 0
+
+    default_json, default_md = default_paths[args.mode]
+    out_path = Path(args.out) if args.out else default_json
+    md_path = Path(args.md_out) if args.md_out else default_md
+    run_eval(questions, args.mode, args, out_path, md_path)
     return 0
 
 
