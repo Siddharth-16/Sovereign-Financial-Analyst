@@ -4,10 +4,10 @@ import logging
 from typing import Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_ollama import ChatOllama
-from app.config import OLLAMA_MODEL, SYSTEM_PROMPT
+from app.config import SYSTEM_PROMPT
 from app.companies import SLUG_TO_DISPLAY
 from app.exceptions import OllamaUnavailableError
+from app.llm import get_llm
 from app.tools import get_stock_performance, normalize_company, query_financial_reports
 
 logger = logging.getLogger("sovereign_fa.agentic")
@@ -61,7 +61,7 @@ def get_stock_price(ticker: str) -> str:
 TOOLS = [search_filing, get_stock_price]
 TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 
-_llm = ChatOllama(model=OLLAMA_MODEL, temperature=0)
+_llm = get_llm()
 _llm_with_tools = _llm.bind_tools(TOOLS)
 
 
