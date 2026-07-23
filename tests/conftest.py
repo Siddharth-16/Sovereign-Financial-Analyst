@@ -31,6 +31,23 @@ def _ensure_stubs() -> None:
 
         m.ChatOllama = _StubChatOllama
 
+        try:
+            import langchain_groq  
+        except ImportError:
+            m = _stub_module("langchain_groq")
+
+            class _StubChatGroq:
+                def __init__(self, *args, **kwargs):
+                    pass
+
+                def bind_tools(self, *_args, **_kwargs):
+                    return self
+
+                def invoke(self, *_args, **_kwargs):
+                    raise RuntimeError("stub ChatGroq: no real Groq credentials in this environment")
+
+            m.ChatGroq = _StubChatGroq
+
     try:
         import langchain_huggingface 
     except ImportError:
