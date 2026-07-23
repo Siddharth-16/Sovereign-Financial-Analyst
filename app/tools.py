@@ -9,7 +9,7 @@ from app.companies import (
     COMPANY_NAME_MAP,
     TICKER_TO_SLUG as TICKER_TO_COMPANY,
     SLUG_TO_DISPLAY,
-    SLUG_TO_TICKER,  
+    SLUG_TO_TICKER,  # noqa: F401 -- re-exported, consumed by app.agent
     SECTION_NAME_MAP,
     SECTION_DISPLAY_MAP,
 )
