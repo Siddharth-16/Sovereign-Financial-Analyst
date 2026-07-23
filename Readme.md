@@ -284,6 +284,95 @@ streamlit run ui/ui.py
 
 ---
 
+# Deployment
+
+The FastAPI service (`api/main.py`) and the Streamlit UI are containerized separately from the same `Dockerfile` (multi-stage, `api` and `ui` targets), so either can be deployed independently of the other.
+
+## Run locally with Docker Compose
+
+Brings up Ollama, the FastAPI service, and the Streamlit UI together, wired to each other:
+
+```bash
+cp .env.example .env        # fill in SEC_API_KEY if you plan to (re)ingest
+docker compose up --build
+```
+
+First run only -- pull the model into the shared Ollama volume:
+
+```bash
+docker compose run --rm ollama-pull
+```
+
+- API: http://localhost:8000/docs
+- UI: http://localhost:8501
+
+The `chroma_data` volume starts empty. Either populate it by running `scripts/ingest.py` against a mounted `data/raw`, or build the image with a local `chroma_db/` already present (see below) so it's baked in.
+
+## Build a single image
+
+```bash
+docker build --target api -t sovereign-fa-api .
+docker build --target ui  -t sovereign-fa-ui .
+```
+
+If a `chroma_db/` directory exists locally (i.e. you already ran ingestion), it's copied into the image automatically. Otherwise, mount a populated one at runtime:
+
+```bash
+docker run -p 8000:8000 \
+  -e LLM_PROVIDER=ollama -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  -v $(pwd)/chroma_db:/srv/chroma_db \
+  sovereign-fa-api
+```
+
+## Public demo (Render -- no credit card required)
+
+The roadmap's lower-effort path -- a live public URL with minimal infra setup, using hosted inference (Groq) instead of Ollama since a public link can't require visitors to run a local model. Render's free web service tier doesn't require billing details to get started (it does sleep after 15 min of inactivity and takes 30-60s to wake back up on the next request -- fine for a portfolio demo).
+
+1. Push this repo to GitHub if it isn't already.
+2. In the [Render dashboard](https://dashboard.render.com): **New -> Blueprint** -> connect the repo. Render reads `render.yaml` and creates the service automatically.
+3. When prompted, enter `GROQ_API_KEY` (from [console.groq.com](https://console.groq.com)) and `SEC_API_KEY`. These are the two vars marked `sync: false` in `render.yaml` -- Render asks for them once in the dashboard rather than storing them in the repo.
+4. Render builds `Dockerfile` directly (defaulting to the last stage, `api` -- see the comment in the Dockerfile) and deploys.
+
+**Check it's live:**
+
+```bash
+curl https://<your-service>.onrender.com/health
+```
+
+### Alternative: Fly.io
+
+`fly.toml` is also included if you'd rather use Fly instead (requires a card on file, but scales to zero machines when idle to keep cost near-zero):
+
+```bash
+flyctl launch --no-deploy --copy-config --name sovereign-financial-analyst
+flyctl secrets set GROQ_API_KEY=... SEC_API_KEY=...
+flyctl deploy --dockerfile Dockerfile --build-target api
+```
+
+## CI/CD
+
+`.github/workflows/ci-cd.yml` runs on every push/PR:
+
+1. **Lint** -- `ruff check` (pyflakes rules: undefined names, unused imports, syntax errors)
+2. **Test** -- the pytest suite (68 tests, no external services required)
+3. **Deploy** -- on push to `main` only, after tests pass: triggers Render's deploy hook
+
+Render builds directly from this GitHub repo on its own infrastructure, so no image registry/push step is needed. Render's dashboard has an "Auto-Deploy" toggle that deploys on every push regardless of CI status; the workflow instead triggers a deploy explicitly via a Deploy Hook once tests pass, so a broken push never gets deployed. To use this: **service -> Settings -> Deploy Hook** in the Render dashboard, copy the URL, and add it as a repo secret named `RENDER_DEPLOY_HOOK_URL` (**GitHub repo -> Settings -> Secrets and variables -> Actions**). If you'd rather rely on Render's own auto-deploy instead, leave that secret unset -- the deploy job will just fail harmlessly and Render will have already deployed on its own.
+
+## Environment variables
+
+See `.env.example` for the full list. The ones that matter for deployment specifically:
+
+| Variable           | Default                  | Notes                                                                                             |
+| ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `LLM_PROVIDER`     | `ollama`                 | `ollama` for local/private, `groq` for the public demo                                            |
+| `OLLAMA_BASE_URL`  | `http://localhost:11434` | Set to `http://ollama:11434` in docker-compose                                                    |
+| `GROQ_API_KEY`     | --                       | Required only when `LLM_PROVIDER=groq`                                                            |
+| `CHROMA_PATH`      | `./chroma_db`            | Point at a mounted volume in containerized setups                                                 |
+| `CHROMA_S3_BUCKET` | --                       | Optional: sync a pre-built index from S3 on container startup instead of baking it into the image |
+
+---
+
 # Project Structure
 
 ```
@@ -291,9 +380,14 @@ sovereign-financial-analyst/
 
 app/
    agent.py          # rule-based query routing + LLM synthesis
+   agentic_router.py # LLM tool-calling routing (mode="agentic")
+   llm.py            # LLM provider factory (ollama / groq)
    tools.py          # retrieval + stock tools
    config.py         # configuration
    companies.py      # single source of truth: company/ticker/section data
+
+api/
+   main.py           # FastAPI service
 
 data/
    raw/              # raw 10-K filings
@@ -305,6 +399,11 @@ scripts/
    ingest.py            # filing ingestion pipeline
    data.py              # download SEC 10-K filings using SEC API
    check_coverage.py    # verifies ingestion produced all companies x years x sections
+   sync_chroma.py       # optional: pull a pre-built chroma_db from S3 on container start
+
+docker/
+   entrypoint-api.sh    # api container entrypoint (optional S3 sync -> uvicorn)
+   entrypoint-ui.sh      # ui container entrypoint (optional S3 sync -> streamlit)
 ```
 
 ---
