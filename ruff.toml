@@ -1,0 +1,19 @@
+line-length = 110
+target-version = "py311"
+
+[lint]
+# Scoped to pyflakes (real bugs: undefined names, unused imports, syntax
+# errors) rather than full style/import-order enforcement (E/W/I), since
+# this lint gate is being introduced in Phase 3 on top of an existing
+# codebase -- it should catch genuine breakage, not demand a repo-wide
+# reformat as a side effect of adding CI.
+select = ["F", "E9"]
+
+[lint.per-file-ignores]
+# tests/conftest.py deliberately does `try: import real_pkg / except ImportError:
+# stub it` to decide whether to stub heavy ML deps out in CI -- those imports
+# exist to probe availability, not to be used, so F401 is a false positive here.
+"tests/conftest.py" = ["F401"]
+# eval.py imports `llm` from app.agent purely so it's initialized/importable
+# when the eval report runs; not directly referenced elsewhere in the file.
+"eval/eval.py" = ["F401", "E402"]

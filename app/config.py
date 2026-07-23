@@ -3,9 +3,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-CHROMA_PATH = "./chroma_db"
-EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-OLLAMA_MODEL = "llama3.1"
+# --------------------------------------------------------------------- paths
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_db")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+
+# ----------------------------------------------------------------------- llm
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
 FINANCIAL_KEYWORDS = {
     "10-k", "risk", "revenue", "filing", "stock",

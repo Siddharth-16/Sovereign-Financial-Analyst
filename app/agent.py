@@ -1,7 +1,6 @@
 from typing import Optional
 import logging
 import re
-from langchain_ollama import ChatOllama
 from app.tools import (
     get_stock_performance,
     query_financial_reports,
@@ -9,13 +8,14 @@ from app.tools import (
     SLUG_TO_DISPLAY,
     SLUG_TO_TICKER,
 )
-from app.config import OLLAMA_MODEL, FINANCIAL_KEYWORDS
+from app.config import FINANCIAL_KEYWORDS
 from app.companies import COMPANY_NAME_MAP as COMPANY_ALIASES
 from app.exceptions import OllamaUnavailableError
+from app.llm import get_llm
 
 logger = logging.getLogger("sovereign_fa.agent")
 
-llm = ChatOllama(model=OLLAMA_MODEL, temperature=0)
+llm = get_llm()
 
 NORMALIZED_TICKER_MAP = {k.lower(): v for k, v in TICKER_TO_COMPANY.items()}
 
