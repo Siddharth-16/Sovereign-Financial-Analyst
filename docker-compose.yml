@@ -1,0 +1,75 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sfa-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["ollama", "pull", "llama3.1"]
+    environment:
+      OLLAMA_HOST: "ollama:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: sfa-api
+    ports:
+      - "8000:8000"
+    environment:
+      LLM_PROVIDER: "ollama"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "llama3.1"
+      CHROMA_PATH: "/srv/chroma_db"
+      SEC_API_KEY: "${SEC_API_KEY:-}"
+    volumes:
+      - chroma_data:/srv/chroma_db
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui
+    container_name: sfa-ui
+    ports:
+      - "8501:8501"
+    environment:
+      LLM_PROVIDER: "ollama"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "llama3.1"
+      CHROMA_PATH: "/srv/chroma_db"
+      SEC_API_KEY: "${SEC_API_KEY:-}"
+    volumes:
+      - chroma_data:/srv/chroma_db
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+  chroma_data:
