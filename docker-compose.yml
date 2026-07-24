@@ -2,6 +2,7 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: sfa-ollama
+    profiles: ["containerized-ollama"]
     ports:
       - "11434:11434"
     volumes:
@@ -15,10 +16,11 @@ services:
 
   ollama-pull:
     image: ollama/ollama:latest
+    profiles: ["containerized-ollama"]
     depends_on:
       ollama:
         condition: service_healthy
-    entrypoint: ["ollama", "pull", "llama3.1"]
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-llama3.2:3b}"]
     environment:
       OLLAMA_HOST: "ollama:11434"
     volumes:
@@ -34,17 +36,14 @@ services:
       - "8000:8000"
     environment:
       LLM_PROVIDER: "ollama"
-      OLLAMA_BASE_URL: "http://ollama:11434"
-      OLLAMA_MODEL: "llama3.1"
+      OLLAMA_BASE_URL: "${DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-llama3.2:3b}"
       CHROMA_PATH: "/srv/chroma_db"
       SEC_API_KEY: "${SEC_API_KEY:-}"
     volumes:
       - chroma_data:/srv/chroma_db
-    depends_on:
-      ollama:
-        condition: service_healthy
-      ollama-pull:
-        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   ui:
@@ -57,17 +56,14 @@ services:
       - "8501:8501"
     environment:
       LLM_PROVIDER: "ollama"
-      OLLAMA_BASE_URL: "http://ollama:11434"
-      OLLAMA_MODEL: "llama3.1"
+      OLLAMA_BASE_URL: "${DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-llama3.2:3b}"
       CHROMA_PATH: "/srv/chroma_db"
       SEC_API_KEY: "${SEC_API_KEY:-}"
     volumes:
       - chroma_data:/srv/chroma_db
-    depends_on:
-      ollama:
-        condition: service_healthy
-      ollama-pull:
-        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
 volumes:
