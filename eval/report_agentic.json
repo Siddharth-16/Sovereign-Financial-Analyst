@@ -2,21 +2,21 @@
   "mode": "agentic",
   "summary": {
     "total_questions": 28,
-    "routing_company_accuracy": 1.0,
+    "routing_company_accuracy": 0.929,
     "routing_section_accuracy": 1.0,
-    "retrieval_recall_at_k": 1.0,
-    "retrieval_hits": 28,
-    "retrieval_misses": 0,
+    "retrieval_recall_at_k": 0.929,
+    "retrieval_hits": 26,
+    "retrieval_misses": 2,
     "unrouted_questions": 0,
     "groundedness_graded": 28,
-    "groundedness_score": 0.893,
+    "groundedness_score": 0.821,
     "judge_errors": 0,
     "avg_tool_calls_per_question": 1.0,
     "questions_with_zero_tool_calls": 0,
     "by_category": {
       "business": {
         "total": 7,
-        "retrieval_recall_at_k": 1.0,
+        "retrieval_recall_at_k": 0.857,
         "groundedness_score": 0.857
       },
       "risk_factors": {
@@ -26,13 +26,13 @@
       },
       "mdna": {
         "total": 7,
-        "retrieval_recall_at_k": 1.0,
-        "groundedness_score": 0.857
+        "retrieval_recall_at_k": 0.857,
+        "groundedness_score": 0.714
       },
       "financial_statements": {
         "total": 7,
         "retrieval_recall_at_k": 1.0,
-        "groundedness_score": 0.857
+        "groundedness_score": 0.714
       }
     }
   },
@@ -55,13 +55,15 @@
       "groundedness_run": true,
       "grounded": false,
       "unsupported_claims": [
-        "Automotive products, including Drive software and hardware platforms for autonomous vehicles",
-        "Drive PX 2 platform for autonomous driving"
+        "Nvidia's main business segments are: * Datacenter, Professional Visualization, Gaming",
+        "The company describes its core products as follows: * Data Center: The company will have a broader and faster Data Center product launch cadence to meet a growing and diverse set of AI opportunities.",
+        "Professional Visualization: Product transitions are complex and can impact revenue as the company often ships both new and prior architecture products simultaneously.",
+        "Gaming: Deployment of new products to customers creates additional challenges due to the complexity of its technologies, which has impacted and may in the future impact the timing of customer purchases or otherwise impact demand."
       ],
-      "judge_reasoning": "The provided context does not mention automotive products or the Drive PX 2 platform.",
+      "judge_reasoning": "The provided context does not mention 'Professional Visualization' as a business segment, but rather mentions it alongside 'Data Center' and 'Gaming'. Additionally, the descriptions provided for each segment do not accurately reflect the language used in the context to describe those segments.",
       "judge_error": null,
-      "answer": "Nvidia's main business segments are:\n\n* Graphics Processing Units (GPUs) for Gaming\n* Data Center products, including GPUs and High-Performance Computing (HPC) solutions\n* Professional Visualization products, including Quadro GPUs and other visualization solutions\n* Automotive products, including Drive software and hardware platforms for autonomous vehicles\n\nThe company describes its core products as follows:\n\n* GeForce GPUs for gaming PCs\n* Tesla V100 and A100 GPUs for data center applications\n* Quadro RTX 8000 and RTX 6000 GPUs for professional visualization\n* Drive PX 2 platform for autonomous driving",
-      "latency_sec": 140.69763088226318,
+      "answer": "Nvidia's main business segments are:\n\n* Datacenter\n* Professional Visualization\n* Gaming\n\nThe company describes its core products as follows:\n\n* Data Center: The company will have a broader and faster Data Center product launch cadence to meet a growing and diverse set of AI opportunities.\n* Professional Visualization: Product transitions are complex and can impact revenue as the company often ships both new and prior architecture products simultaneously.\n* Gaming: Deployment of new products to customers creates additional challenges due to the complexity of its technologies, which has impacted and may in the future impact the timing of customer purchases or otherwise impact demand.",
+      "latency_sec": 32.63943004608154,
       "tool_calls_count": 1
     },
     {
@@ -70,23 +72,20 @@
       "category": "business",
       "expected_company": "tesla",
       "expected_section": "business",
-      "routed_company": "tesla",
+      "routed_company": "tesla, inc.",
       "routed_section": "business",
-      "routing_company_correct": true,
+      "routing_company_correct": false,
       "routing_section_correct": true,
-      "retrieval_hit": true,
-      "retrieval_citations": [
-        "Tesla 10-K FY2024 \u2013 Business",
-        "Tesla 10-K FY2023 \u2013 Business"
-      ],
-      "retrieval_note": "",
+      "retrieval_hit": false,
+      "retrieval_citations": [],
+      "retrieval_note": "no citations returned by the agent's tool call(s)",
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the CONTEXT, without making any claims that are not supported by it.",
+      "judge_reasoning": "The answer accurately reflects the limitation of the available data.",
       "judge_error": null,
-      "answer": "Tesla's business model is based on designing, developing, manufacturing, selling, and leasing high-performance fully electric vehicles and energy generation and storage systems. The company offers services related to its products, including financial and other services tailored to its customers. Tesla's primary product lines include:\n\n* High-performance fully electric vehicles\n* Energy generation and storage systems\n* Services related to its products\n\nTesla emphasizes performance, attractive styling, and safety in the design and manufacture of its products. The company is also continuing to develop full self-driving technology for improved safety.",
-      "latency_sec": 122.21544075012207,
+      "answer": "I can only answer questions about indexed company filings and stock performance.",
+      "latency_sec": 16.888036012649536,
       "tool_calls_count": 1
     },
     {
@@ -108,10 +107,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the context, listing the three main reportable business segments and noting that 'Corporate' includes remaining activities.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the context, listing the three main reportable business segments and mentioning the Corporate segment as a catch-all for remaining activities.",
       "judge_error": null,
-      "answer": "The main reportable business segments of JPMorgan Chase are:\n\n* Consumer & Community Banking\n* Commercial & Investment Bank\n* Asset & Wealth Management\n* Corporate (remaining activities)",
-      "latency_sec": 103.84615802764893,
+      "answer": "The main reportable business segments of JPMorgan Chase are:\n\n* Consumer & Community Banking\n* Commercial & Investment Bank\n* Asset & Wealth Management\n\nThese three segments represent the primary business units of the company, and their results are presented as if they were stand-alone businesses. The company also has a Corporate segment that includes remaining activities not classified within the above three segments.",
+      "latency_sec": 27.63272714614868,
       "tool_calls_count": 1
     },
     {
@@ -135,8 +134,8 @@
       "unsupported_claims": [],
       "judge_reasoning": "The answer accurately reflects the information provided in the context without making any unsupported claims.",
       "judge_error": null,
-      "answer": "Walmart describes its business strategy as competing with various retailers operating different formats, including discount, department, retail, and wholesale grocery stores. The company operates multiple store formats, including supercenters, grocery stores, and e-commerce platforms, to deliver a customer-centric omni-channel experience. Walmart's competitive position is largely determined by its ability to develop and effectively operate these different formats at the right locations.\n\nThe company faces intense competition from well-funded competitors with longer histories in these lines of business, greater brand recognition, and improved access to merchandise. Consolidation or substantially reducing operations within certain segments of the retail industry may result in competitors with improved financial resources, market penetration, and competitive positions.",
-      "latency_sec": 70.06001472473145,
+      "answer": "**Business Strategy**\n\nWalmart's business strategy is to compete with brick and mortar, eCommerce, and omni-channel retailers operating various store formats. The company aims to deliver a customer-centric omni-channel experience, which largely determines its competitive position in the retail industry.\n\n**Store Formats**\n\nWalmart operates different store formats, including:\n\n* Discount stores\n* Department stores\n* Retail stores\n* Wholesale grocery stores\n* Drug stores\n* Dollar stores\n* Variety stores\n* Supermarkets\n* Supercenters\n* Membership-only warehouse clubs\n* Gasoline stations\n\nThese store formats are designed to cater to various customer needs and preferences, allowing Walmart to compete effectively in the rapidly evolving retail landscape.",
+      "latency_sec": 30.60838031768799,
       "tool_calls_count": 1
     },
     {
@@ -158,10 +157,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the context without making any claims that are not supported.",
+      "judge_reasoning": "The answer accurately reflects the therapeutic areas mentioned in the provided context, and the business segments are also supported by the text.",
       "judge_error": null,
-      "answer": "Eli Lilly's main therapeutic areas are:\n\n\u2022 Metabolism (including diabetes, obesity, and cardiovascular)\n\u2022 Immunology\n\u2022 Neuroscience\n\u2022 Oncology\n\nTheir business segments include internal pharmaceutical research and external collaborations with academic institutions, research-based pharmaceutical and biotechnology companies, and other organizations. They also invest in external research and technologies to complement their own efforts.",
-      "latency_sec": 62.59559392929077,
+      "answer": "Eli Lilly's main therapeutic areas are:\n\n* Metabolism (including diabetes, obesity, and cardiovascular)\n* Immunology\n* Neuroscience\n* Oncology\n\nThe company's business segments include internal pharmaceutical research and development, external research and technologies, and other businesses.",
+      "latency_sec": 25.745332956314087,
       "tool_calls_count": 1
     },
     {
@@ -184,10 +183,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the three reportable segments mentioned in the provided context.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the context about Boeing's primary business segments.",
       "judge_error": null,
-      "answer": "Boeing's primary business segments are:\n\n* Commercial Airplanes (BCA)\n* Defense, Space & Security (BDS)\n* Global Services (BGS)",
-      "latency_sec": 68.35739398002625,
+      "answer": "Boeing's primary business segments are:\n\n* Commercial Airplanes (BCA)\n* Defense, Space & Security (BDS)\n* Global Services (BGS)\n\nThese three segments operate as reportable segments of the company and offer a range of products and services to customers worldwide.",
+      "latency_sec": 27.397591829299927,
       "tool_calls_count": 1
     },
     {
@@ -208,10 +207,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the context.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the context about Visa's core business and revenue model.",
       "judge_error": null,
-      "answer": "According to Visa's 10-K filing for Fiscal Year 2023, the company describes its core business as facilitating consumer payments through its network of networks. The core products driving growth are credit, debit, and prepaid cards, with a focus on moving trillions of dollars of consumer spending from cash and checks to digital accounts. The revenue model is based on performance-based incentives, marketing and other support payments that impact revenues and profitability.",
-      "latency_sec": 71.0386860370636,
+      "answer": "**Business Model**\n\nVisa's core business is focused on moving trillions of dollars of consumer spending in cash and checks to cards and digital accounts on its network of networks. The company's growth has been driven by the strength of its core products, including credit, debit, and prepaid.\n\n*   Credit: Credit cards and digital credentials allow consumers and businesses to access credit to pay for goods and services.\n*   Debit: Visa offers debit solutions that enable consumers to make purchases without incurring interest charges or fees.\n\n**Revenue Model**\n\nVisa's revenue model is based on a variety of payment products and services, including:\n\n*   Interchange fees: These fees are paid by merchants to Visa when a customer uses their card to make a purchase.\n*   Interest income: Visa earns interest on outstanding credit balances.\n*   Other fees: The company also generates revenue from other fees, such as late payment fees and foreign transaction fees.\n\nOverall, Visa's business model is designed to accelerate revenue growth in consumer payments, new flows, and value-added services.",
+      "latency_sec": 35.93299674987793,
       "tool_calls_count": 1
     },
     {
@@ -233,10 +232,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the supply chain risks disclosed by Nvidia in its 10-K filing.",
+      "judge_reasoning": "All claims in ANSWER are supported by specific text in CONTEXT.",
       "judge_error": null,
-      "answer": "Nvidia discloses several supply chain risks in its 10-K filing, including:\n\n* Macroeconomic factors such as inflation, interest rate changes, capital market volatility, global supply chain constraints, tariffs, and global economic and geopolitical developments that may impact demand for their products.\n* Dependency on third-party suppliers and their technology to manufacture, assemble, test, or package their products, which reduces their control over product quantity and quality, manufacturing yields, and product delivery schedules.\n* Failure to estimate customer demand accurately, leading to mismatches between supply and demand.\n\nThese risks could harm Nvidia's business, financial condition, results of operations, or reputation, potentially causing a decline in their stock price.",
-      "latency_sec": 81.98299908638,
+      "answer": "Nvidia discloses the following supply chain risks in its 10-K filings:\n\n\u2022 Global supply chain constraints, tariffs, and global economic and geopolitical developments may have direct and indirect impacts on its results of operations.\n\u2022 Dependency on third-party suppliers and their technology to manufacture, assemble, test, or package its products reduces its control over product quantity and quality, manufacturing yields, and product delivery schedules.\n\u2022 Failure to estimate customer demand accurately has led and could lead to mismatches between supply and demand.",
+      "latency_sec": 31.595534086227417,
       "tool_calls_count": 1
     },
     {
@@ -251,16 +250,16 @@
       "routing_section_correct": true,
       "retrieval_hit": true,
       "retrieval_citations": [
-        "Apple 10-K FY2024 \u2013 Risk Factors"
+        "Apple 10-K FY2025 \u2013 Risk Factors"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the risks mentioned in the provided context without adding any unsupported claims.",
+      "judge_reasoning": "The answer accurately summarizes the regulatory risks related to Apple's global operations as described in the provided context.",
       "judge_error": null,
-      "answer": "Based on Apple's 10-K filing for Fiscal Year 2024, the company highlights several regulatory risks related to its global operations. These include:\n\n* Natural disasters and extreme weather events due to climate change\n* Interruptions by fire, power shortages, nuclear power plant accidents, and other industrial accidents\n* Terrorist attacks and other hostile acts\n* Ransomware and other cybersecurity attacks\n* Labor disputes\n* Public health issues\n\nThese risks can result in significant disruptions to Apple's global supply chains, which are highly concentrated. Geopolitical tensions or conflict could also lead to disruptions.",
-      "latency_sec": 75.5812759399414,
+      "answer": "Here is a summary of the regulatory risks related to Apple's global operations:\n\n* Macroeconomic and industry risks: Adverse economic conditions can materially adversely affect Apple's business, results of operations, financial condition, and stock price.\n* International operations: Apple has significant sales outside the US, representing a majority of its total net sales, and its global supply chain is large and complex, with a majority of supplier facilities located outside the US.\n* Dependence on global economic conditions: Apple's operations and performance depend significantly on global and regional economic conditions, making it vulnerable to adverse economic conditions.",
+      "latency_sec": 29.87017321586609,
       "tool_calls_count": 1
     },
     {
@@ -275,16 +274,16 @@
       "routing_section_correct": true,
       "retrieval_hit": true,
       "retrieval_citations": [
-        "Tesla 10-K FY2024 \u2013 Risk Factors"
+        "Tesla 10-K FY2023 \u2013 Risk Factors"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the CONTEXT, specifically mentioning 'Risks Related to Our Ability to Grow Our Business' and describing manufacturing and production risks.",
+      "judge_reasoning": "The answer accurately reflects the risks mentioned in the provided context.",
       "judge_error": null,
-      "answer": "Based on the search_filing tool output, Tesla discusses several manufacturing and production risks, including:\n\n* Delays in launching and ramping the production of their products and features\n* Inability to control manufacturing costs\n\nThese risks are described in the \"Risks Related to Our Ability to Grow Our Business\" section of the 10-K filing.",
-      "latency_sec": 54.168251276016235,
+      "answer": "Tesla discusses manufacturing and production risks due to its limited operating history relative to established competitors, customer unfamiliarity with its products, potential delays in scaling manufacturing, delivery, and service operations, competition and uncertainty regarding the future of electric vehicles or other products and services, and quarterly production and sales performance compared with market expectations.",
+      "latency_sec": 26.243525981903076,
       "tool_calls_count": 1
     },
     {
@@ -306,10 +305,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the disclosed environmental and regulatory risks mentioned in the provided context.",
+      "judge_reasoning": "The answer accurately summarizes the environmental and regulatory risks disclosed by ExxonMobil without stating any claims not supported by the context.",
       "judge_error": null,
-      "answer": "ExxonMobil discloses regulatory and litigation risks, including changes in law or interpretation of settled law, changes in policy, increases in taxes, duties, or government royalty rates, price controls, changes in environmental regulations, actions by policy-makers, regulators, or other actors to delay or deny necessary licenses and permits, adoption of regulations mandating efficiency standards, the use of alternative fuels or uncompetitive fuel components.",
-      "latency_sec": 70.278146982193,
+      "answer": "Regulatory and litigation risks are a significant concern for ExxonMobil. These risks include:\n\n* Changes in laws or regulations that increase the company's cost of compliance or reduce available business opportunities\n* Increases in taxes, duties, or government royalty rates (including retroactive claims)\n* Price controls\n* Actions by policy-makers, regulators, or other actors to delay or deny necessary licenses and permits\n* Adoption of regulations mandating efficiency standards, the use of alternative fuels, or uncompetitive fuel components\n\nThese risks can result in reduced returns for the company.",
+      "latency_sec": 30.77175498008728,
       "tool_calls_count": 1
     },
     {
@@ -331,10 +330,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "All claims made by ANSWER are supported by CONTEXT, which describes similar risks related to data privacy and regulation.",
+      "judge_reasoning": "All claims made by ANSWER are supported by CONTEXT, which provides detailed information on data privacy and regulation risks.",
       "judge_error": null,
-      "answer": "According to Meta's 10-K filing, the company describes several risks related to data privacy and regulation. These include:\n\n* Uncertainty in the interpretation and enforcement of the European General Data Protection Regulation (GDPR)\n* Potential penalties for non-compliance with GDPR requirements\n* Similar data protection regulations in Brazil, the United Kingdom, and other countries that may impose additional requirements on Meta's products and services\n* The California Consumer Privacy Act (CCPA) and similar comprehensive privacy laws in other states that afford users certain rights and limitations on Meta's use of their personal information.",
-      "latency_sec": 73.95507192611694,
+      "answer": "Meta faces risks related to data privacy and regulation, including:\n\n* Implementation of product changes and controls as a result of requirements under the European General Data Protection Regulation (GDPR)\n* Submission of personal data breach notifications to lead European Union privacy regulator\n* Significant penalties for non-compliance with GDPR notification obligation and other requirements\n* Uncertainty in interpretation and enforcement of GDPR, which may have a negative impact on business operations\n* Enactment of similar data protection regulations in Brazil, the United Kingdom, and other countries\n* California Consumer Privacy Act (CCPA) establishing transparency rules and creating data privacy rights for users\n* Proposed or enacted comprehensive privacy laws in other states that afford users with certain rights",
+      "latency_sec": 33.65784001350403,
       "tool_calls_count": 1
     },
     {
@@ -356,10 +355,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "All claims made by the answer are supported by the provided context.",
+      "judge_reasoning": "The answer accurately reflects all risk factors related to drug development and clinical trials mentioned in the provided context.",
       "judge_error": null,
-      "answer": "According to Pfizer's 10-K filing for FY2025, the company discloses several risk factors related to drug development and clinical trials. These include:\n\n* The high degree of uncertainty and risk involved in the discovery and development process\n* The potential for product candidates to fail at any stage of development\n* Unfavorable pre-clinical and clinical trial results or new data that may not support further clinical development\n* Decisions made early in the development process can impact marketing strategy and payer reimbursement possibilities\n* Regulatory agencies may require additional clinical trials or studies, which could result in loss of marketing approval or changes to labeling.\nThese risk factors highlight the challenges and uncertainties associated with drug development and clinical trials.",
-      "latency_sec": 78.93884801864624,
+      "answer": "Pfizer discloses several risk factors related to drug development and clinical trials, including:\n\n* The unpredictability of the discovery and development process\n* Product candidates failing at any stage of the process\n* Unfavorable pre-clinical and clinical trial results\n* Regulatory challenges and potential exclusions from future clinical trials\n* Potential quality issues that may impact product approval\n* The need for additional clinical trials or studies to support marketing authorization\n* Post-marketing studies and clinical trials that may raise safety or efficacy concerns\n* Changes in government spending on entitlement programs, including Medicare and Medicaid, which could affect payment for Pfizer's products.",
+      "latency_sec": 55.218607902526855,
       "tool_calls_count": 1
     },
     {
@@ -381,10 +380,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the content of the provided context, specifically mentioning product safety and quality risks, operational execution risks, and supply chain and business disruption risks.",
+      "judge_reasoning": "The answer accurately reflects the risk factors disclosed in the provided context.",
       "judge_error": null,
-      "answer": "Based on the search_filing tool output, General Electric discloses several risk factors related to its industrial operations. These include:\n\n* Product safety and quality risks: A major failure or quality issue affecting GE's products or third-party products with which their products are integrated can adversely affect their business, reputation, financial position, results of operations, and cash flows.\n* Operational execution risks: Successfully executing the significant production and delivery ramp efforts in connection with the growth of newer engine platforms such as the LEAP depends on suppliers having access to materials, skilled labor, and production capacity, making timely deliveries, and meeting required safety, quality, and performance standards for commercial and military aviation.\n* Supply chain and business disruption risks: Disruptions in deliveries, capacity constraints, production disruptions up- or down-stream, price increases, or decreased availability of raw materials or commodities can have a material adverse effect on GE's operations and financial performance.\n\nThese risk factors are disclosed in the General Electric 10-K FY2023 and FY2025 filings under the \"Risk Factors\" section.",
-      "latency_sec": 124.96813178062439,
+      "answer": "General Electric discloses the following risk factors related to its industrial operations:\n\n* Product safety and quality risks, including the potential for major failures or quality issues affecting products or third-party products with which GE's products are integrated.\n* Supply chain and business disruption risks, including disruptions in deliveries, capacity constraints, production disruptions up- or down-stream, price increases, or decreased availability of raw materials or commodities.\n* Operational execution challenges that could have a material adverse effect on the company's business, reputation, financial position, results of operations, and cash flows.\n* Information management and data protection and security risks, including cybersecurity threats.\n\nThese risks are related to GE's industrial operations and could potentially impact its business, reputation, financial position, results of operations, and cash flows.",
+      "latency_sec": 36.4529070854187,
       "tool_calls_count": 1
     },
     {
@@ -399,18 +398,20 @@
       "routing_section_correct": true,
       "retrieval_hit": true,
       "retrieval_citations": [
+        "Microsoft 10-K FY2025 \u2013 MD&A",
         "Microsoft 10-K FY2023 \u2013 MD&A"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
-      "grounded": true,
+      "grounded": false,
       "unsupported_claims": [
-        "revenue growth drivers are not explicitly stated"
+        "Office Consumer products and cloud services revenue increased",
+        "Microsoft 365 Consumer subscribers grew"
       ],
-      "judge_reasoning": "The answer states that revenue growth drivers are not explicitly stated, but this is supported by CONTEXT which mentions that 'growth comparisons relate to the corresponding period of last fiscal year', implying that there may be some discussion of growth, even if it's not explicit.",
+      "judge_reasoning": "The MD&A Analysis answer includes claims about Office Consumer products and cloud services revenue increase and Microsoft 365 Consumer subscriber growth, but these are not supported by the provided CONTEXT.",
       "judge_error": null,
-      "answer": "According to Microsoft's MD&A in the 10-K filing for fiscal year 2023, the company mentions that revenue growth drivers are not explicitly stated. However, it does mention that certain metrics have been updated, including expanding the Surface metric into a broader Devices metric to incorporate additional revenue streams. This suggests that Microsoft is focusing on growing its devices business, but it does not provide specific information on what drives revenue growth for the company as a whole.",
-      "latency_sec": 61.82485032081604,
+      "answer": "**MD&A Analysis**\n\nAccording to Microsoft's 10-K filing for fiscal year 2025, the revenue growth drivers are:\n\n* Productivity and Business Processes Revenue: increased $5.9 billion or 9% compared to fiscal year 2022\n* Office Commercial products and cloud services revenue: increased $3.7 billion or 10%\n\t+ Office 365 Commercial revenue grew 13% with seat growth of 11%, driven by small and medium business and frontline worker offerings, as well as growth in revenue per user.\n\t+ Office Commercial products revenue declined 21% driven by continued customer shift to cloud offerings.\n* LinkedIn revenue: increased $1.3 billion or 10%\n* Dynamics products and cloud services revenue: increased $750 million or 16%\n\nThese segments contributed to the overall increase in operating income of $4.5 billion or 15%.",
+      "latency_sec": 39.087165117263794,
       "tool_calls_count": 1
     },
     {
@@ -425,17 +426,20 @@
       "routing_section_correct": true,
       "retrieval_hit": true,
       "retrieval_citations": [
-        "Amazon 10-K FY2023 \u2013 MD&A",
-        "Amazon 10-K FY2025 \u2013 MD&A"
+        "Amazon 10-K FY2025 \u2013 MD&A",
+        "Amazon 10-K FY2023 \u2013 MD&A"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
-      "grounded": true,
-      "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information presented in the MD&A section of Amazon's 10-K filings for 2021 and 2022.",
+      "grounded": false,
+      "unsupported_claims": [
+        "operating margin trends",
+        "AWS operating income also increased in 2024"
+      ],
+      "judge_reasoning": "The MD&A discusses operating income for different segments, but does not explicitly discuss 'operating margin trends'. Additionally, the increase in AWS operating income is mentioned for 2022, not 2024.",
       "judge_error": null,
-      "answer": "According to Amazon's Management's Discussion and Analysis (MD&A) section of their 10-K filings, operating margin trends are discussed as follows:\n\n* In 2022, AWS sales increased by 29% compared to the prior year, primarily driven by increased customer usage and partially offset by pricing changes.\n* Operating income was $24.9 billion in 2021 and $12.2 billion in 2022.\n* The company believes that operating income is a more meaningful measure than gross profit and gross margin due to the diversity of their product categories and services.\n\nNote: The MD&A section for 2023 and 2024 is not provided, but it can be found in the actual 10-K filings.",
-      "latency_sec": 82.2213089466095,
+      "answer": "Amazon's MD&A discusses operating margin trends by reporting operating income for different segments, including North America, International, and AWS. The company believes that operating income is a more meaningful measure than gross profit and gross margin due to the diversity of its product categories and services. In 2024, North America operating income increased primarily due to increased unit sales and advertising sales, while International operating income improved due to increased unit sales and advertising sales, partially offset by increased shipping and fulfillment costs. AWS operating income also increased in 2022, driven by increased customer usage and long-term customer contracts.",
+      "latency_sec": 31.786980152130127,
       "tool_calls_count": 1
     },
     {
@@ -456,10 +460,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the MD&A section of the 10-K report.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the MD&A section of AMD's Form 10-K.",
       "judge_error": null,
-      "answer": "According to AMD's MD&A, the Data Center segment saw a 7% increase in net revenue from $6.0 billion in 2022 to $6.5 billion in 2023, primarily driven by higher sales of AMD Instinct GPUs and 4th Gen AMD EPYC CPUs.",
-      "latency_sec": 81.09589695930481,
+      "answer": "**Segment Revenue Trends**\n\nAMD's revenue trends by segment are as follows:\n\n*   Data Center: $6.5 billion in 2023, increasing by 7% compared to 2022, driven primarily by higher sales of AMD Instinct GPUs and 4th Gen AMD EPYC CPUs.\n*   Client: $4.651 billion in 2023, decreasing from $6.201 billion in 2022.\n*   Gaming: $6.212 billion in 2023, increasing from $6.805 billion in 2022.\n*   Embedded: $5.321 billion in 2023, increasing from $4.552 billion in 2022.\n\nThese trends indicate that AMD's revenue is driven by strong sales of its Data Center and Gaming segments, while the Client segment has experienced a decline. The Embedded segment also saw an increase in revenue.",
+      "latency_sec": 47.98484516143799,
       "tool_calls_count": 1
     },
     {
@@ -468,28 +472,20 @@
       "category": "mdna",
       "expected_company": "broadcom",
       "expected_section": "mdna",
-      "routed_company": "broadcom",
+      "routed_company": "broadcom inc.",
       "routed_section": "mdna",
-      "routing_company_correct": true,
+      "routing_company_correct": false,
       "routing_section_correct": true,
-      "retrieval_hit": true,
-      "retrieval_citations": [
-        "Broadcom 10-K FY2023 \u2013 MD&A",
-        "Broadcom 10-K FY2024 \u2013 MD&A",
-        "Broadcom 10-K FY2025 \u2013 MD&A"
-      ],
-      "retrieval_note": "",
+      "retrieval_hit": false,
+      "retrieval_citations": [],
+      "retrieval_note": "no citations returned by the agent's tool call(s)",
       "groundedness_run": true,
-      "grounded": false,
-      "unsupported_claims": [
-        "The gross margin trend for Broadcom's semiconductor solutions segment has been decreasing",
-        "from 79% in fiscal year 2023 to 58% in fiscal year 2025",
-        "the decrease is attributed to strong demand for networking products, primarily AI networking products, and custom AI accelerators, which have lower gross margins compared to other products"
-      ],
-      "judge_reasoning": "The provided context does not support the claim that the gross margin trend for Broadcom's semiconductor solutions segment has been decreasing.",
+      "grounded": true,
+      "unsupported_claims": [],
+      "judge_reasoning": "The answer accurately reflects the limitation of the available data.",
       "judge_error": null,
-      "answer": "The gross margin trend for Broadcom's semiconductor solutions segment has been decreasing, from 79% in fiscal year 2023 to 58% in fiscal year 2025. The decrease is attributed to strong demand for networking products, primarily AI networking products, and custom AI accelerators, which have lower gross margins compared to other products. In contrast, the gross margin trend for Broadcom's infrastructure software segment has been increasing, from 21% in fiscal year 2023 to 42% in fiscal year 2025, due to strong demand for VCF products and the transition to a subscription license model.",
-      "latency_sec": 76.91610598564148,
+      "answer": "I can only answer questions about indexed company filings and stock performance.",
+      "latency_sec": 17.953224182128906,
       "tool_calls_count": 1
     },
     {
@@ -505,16 +501,16 @@
       "retrieval_hit": true,
       "retrieval_citations": [
         "Caterpillar 10-K FY2024 \u2013 MD&A",
-        "Caterpillar 10-K FY2023 \u2013 MD&A"
+        "Caterpillar 10-K FY2025 \u2013 MD&A"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information presented in the MD&A about sales and revenue trends.",
+      "judge_reasoning": "The answer accurately summarizes the provided MD&A context without making any claims that are not supported by it.",
       "judge_error": null,
-      "answer": "According to Caterpillar's MD&A, sales and revenue trends for 2023 compared to 2022 show a 13% increase in total sales and revenues, driven by favorable price realization and higher sales volume. The increase in sales volume was primarily due to higher sales of equipment to end users, partially offset by the impact from changes in dealer inventories. Caterpillar expects sales to continue increasing in 2023, supported by favorable price realization, with a more traditional seasonal pattern expected for the year.",
-      "latency_sec": 64.95971202850342,
+      "answer": "Here is a summary of Caterpillar's sales and revenue trends in their MD&A:\n\n* In 2023, total sales and revenues increased by 13% to $67.060 billion, driven by favorable price realization and higher sales volume.\n* The increase in sales volume was primarily due to higher sales of equipment to end users, partially offset by the impact from changes in dealer inventories.\n* In 2024, total sales and revenues decreased by 3% to $64.809 billion, primarily driven by lower sales volume of $3.543 billion, despite favorable price realization of $1.238 billion.\n* The decrease in sales volume was mainly driven by lower sales of equipment to end users, and changes in dealer inventories had an unfavorable impact on sales volume.\n* Sales were higher in the Energy & Transportation segment, while Construction Industries and Resource Industries saw lower sales.",
+      "latency_sec": 36.57121300697327,
       "tool_calls_count": 1
     },
     {
@@ -536,10 +532,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the provided context, specifically mentioning client activity as the primary driver of net revenues for FICC intermediation and listing specific reasons for the increase in operating expenses.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the MD&A about net income drivers for FICC intermediation and other significant contributors to net revenues, as well as notable expenses that impacted operating results.",
       "judge_error": null,
-      "answer": "The primary driver of net revenues for FICC intermediation for all periods was client activity. The increase in operating expenses compared with 2022 primarily reflected significantly higher impairments related to commercial real estate within CIEs, a write-down of identifiable intangible assets of $506 million related to GreenSky and an impairment of goodwill of $504 million related to Consumer platforms.",
-      "latency_sec": 93.92565774917603,
+      "answer": "The primary driver of net revenues for FICC intermediation was client activity. Other principal transactions and net interest income were also significant contributors to net revenues, but the impact of these drivers varied between 2022 and 2023. In 2023, impairments related to commercial real estate within CIEs, a write-down of identifiable intangible assets, and an impairment of goodwill were notable expenses that impacted operating results.",
+      "latency_sec": 33.331063985824585,
       "tool_calls_count": 1
     },
     {
@@ -560,10 +556,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the MD&A section of Alphabet's 10-K filing for FY2023.",
+      "judge_reasoning": "The answer is a verbatim copy of the provided context, and does not make any additional claims that are not supported by the text.",
       "judge_error": null,
-      "answer": "According to Alphabet's MD&A section of their 10-K filing for FY2023, the company notes that growth in the global smartphone market has slowed due to various factors, including increased market saturation in developed countries. This can affect their mobile advertising revenues. However, they are focused on expanding their products and services to stay in front of trends and maintain and grow their business.",
-      "latency_sec": 56.16987204551697,
+      "answer": "Our users are accessing the Internet via diverse devices and modalities, such as smartphones, wearables, and smart home devices, and want to be able to be connected no matter where they are or what they are doing. We are focused on expanding our products and services to stay in front of these trends in order to maintain and grow our business. We benefit from advertising revenues generated from different channels, including mobile, and newer advertising formats. The margins from these channels and newer products have generally been lower than those from traditional desktop search. Additionally, as the market for a particular device type or modality matures, our advertising revenues may be affected. For example, growth in the global smartphone market has slowed due to various factors, including increased market saturation in developed countries, which can affect our mobile advertising revenues.",
+      "latency_sec": 32.91746997833252,
       "tool_calls_count": 1
     },
     {
@@ -578,16 +574,24 @@
       "routing_section_correct": true,
       "retrieval_hit": true,
       "retrieval_citations": [
-        "Johnson & Johnson 10-K FY2023 \u2013 Financial Statements"
+        "Johnson & Johnson 10-K FY2025 \u2013 Financial Statements"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
-      "grounded": true,
-      "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately states that total assets were $55,294 million at January 1, 2023, which is supported by the Consolidated Balance Sheets in the provided context.",
+      "grounded": false,
+      "unsupported_claims": [
+        "Cash and cash equivalents: $14.1 billion",
+        "Accounts receivable: $13.5 billion",
+        "Inventory: $6.3 billion",
+        "Property, plant, and equipment: $24.9 billion",
+        "Intangible assets: $34.4 billion",
+        "Goodwill: $23.8 billion",
+        "Other assets: $7.2 billion"
+      ],
+      "judge_reasoning": "The provided context does not contain any information about total assets or the specific asset categories mentioned in the answer.",
       "judge_error": null,
-      "answer": "According to the Consolidated Balance Sheets in Johnson & Johnson's 10-K filing for FY2023, the company's total assets were $55,294 million at January 1, 2023. This includes current assets of $55,294 million and non-current assets of $19,803 million (property, plant and equipment, net), $48,325 million (intangible assets, net), and $45,231 million (goodwill).",
-      "latency_sec": 75.58551502227783,
+      "answer": "According to Johnson & Johnson's financial statements, the total assets as of December 31, 2024, were $84.8 billion. This includes:\n\n* Cash and cash equivalents: $14.1 billion\n* Accounts receivable: $13.5 billion\n* Inventory: $6.3 billion\n* Property, plant, and equipment: $24.9 billion\n* Intangible assets: $34.4 billion\n* Goodwill: $23.8 billion\n* Other assets: $7.2 billion\n\nNote that these figures are based on the 2024 Annual Report of Johnson & Johnson, which presents the company's consolidated financial statements for the year ended December 31, 2024.",
+      "latency_sec": 37.81317210197449,
       "tool_calls_count": 1
     },
     {
@@ -602,19 +606,16 @@
       "routing_section_correct": true,
       "retrieval_hit": true,
       "retrieval_citations": [
-        "Walmart 10-K FY2025 \u2013 Financial Statements",
-        "Walmart 10-K FY2024 \u2013 Financial Statements"
+        "Walmart 10-K FY2023 \u2013 Financial Statements"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
-      "grounded": false,
-      "unsupported_claims": [
-        "$260,823 million"
-      ],
-      "judge_reasoning": "The answer states a specific figure for total liabilities, but CONTEXT only shows 'Accrued liabilities' as part of total liabilities and does not provide the total amount.",
+      "grounded": true,
+      "unsupported_claims": [],
+      "judge_reasoning": "The answer accurately reflects the total liabilities as presented in the Consolidated Statements of Cash Flows for Fiscal Years Ended January 31, 2023.",
       "judge_error": null,
-      "answer": "According to Walmart's 10-K filing for Fiscal Year 2025, the total liabilities on the balance sheet are $260,823 million.",
-      "latency_sec": 59.687926054000854,
+      "answer": "Here are the total liabilities for Walmart's balance sheet as of January 31, 2023:\n\n* Current Liabilities:\n\t+ Accounts Payable: $1,425 million\n\t+ Accrued Liabilities: $4,393 million\n\t+ Other Current Liabilities: $1,919 million\n\tTotal Current Liabilities: $7,737 million\n* Non-Current Liabilities:\n\t+ Long-Term Debt: $83,135 million\n\t+ Deferred Income Taxes: $449 million\n\t+ Other Non-Current Liabilities: $76,693 million\n\tTotal Non-Current Liabilities: $160,277 million\n\nTotal Liabilities: $168,014 million",
+      "latency_sec": 40.759312868118286,
       "tool_calls_count": 1
     },
     {
@@ -634,13 +635,11 @@
       "retrieval_note": "",
       "groundedness_run": true,
       "grounded": true,
-      "unsupported_claims": [
-        "there is no specific information provided about cash flow from operations in the search_filing tool output"
-      ],
-      "judge_reasoning": "The answer states that there is no information about cash flow from operations, which is supported by the context as it only mentions cash and cash equivalents without any further details.",
+      "unsupported_claims": [],
+      "judge_reasoning": "The answer accurately reflects the information provided in the context, without making any claims that are not supported by it.",
       "judge_error": null,
-      "answer": "Based on the search_filing tool output, Visa's financial statements disclose that they have one reportable segment, Payment Services. The preparation of consolidated financial statements requires management to make estimates and assumptions about future events, which may change as new events occur and additional information is obtained.\n\nHowever, there is no specific information provided about cash flow from operations in the search_filing tool output. To answer this question accurately, I will call the query_financial_reports tool with the company name \"Visa\" and the section \"Cash Flow Statement\".",
-      "latency_sec": 92.84088182449341,
+      "answer": "According to Visa's financial statements, the company discloses its cash flow from operations in the following way:\n\n* The preparation of consolidated financial statements requires management to make estimates and assumptions about future events, which affect the reported amounts of assets and liabilities and disclosure of contingent assets and liabilities.\n* Cash, cash equivalents, restricted cash, and restricted cash equivalents are presented as a single line item on the balance sheet.\n* The company uses estimates in specific accounting policies, including the use of estimates for revenue recognition and the allowance for credit losses.\n* Future actual results could differ materially from these estimates.\n\nNo specific amount is disclosed for cash flow from operations.",
+      "latency_sec": 36.82961893081665,
       "tool_calls_count": 1
     },
     {
@@ -661,10 +660,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the context.",
+      "judge_reasoning": "The answer accurately states that Boeing's total debt (excluding finance lease obligations) is $53,625 as of December 31, 2024.",
       "judge_error": null,
-      "answer": "According to Boeing's balance sheet in the 10-K filing for FY2024, the company has a carrying amount of $53,625 million in debt, excluding finance lease obligations. This is an increase from the $52,055 million in debt reported at December 31, 2023. The fair value of this debt is also disclosed, with a total fair value of $51,089 million and no breakdown by level (1, 2, or 3) available.",
-      "latency_sec": 80.2585678100586,
+      "answer": "According to Boeing's balance sheet as of December 31, 2024, the company has total debt of $53,625, excluding finance lease obligations. This includes $12 in notes receivable, net. The carrying amount and fair value of this debt are also reported.",
+      "latency_sec": 29.022818088531494,
       "tool_calls_count": 1
     },
     {
@@ -685,10 +684,10 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects that the provided context does not contain any information about total revenue for Nvidia.",
+      "judge_reasoning": "The answer accurately reflects that no specific total revenue figure is provided in the context, and instead mentions estimates and potential differences from actual results.",
       "judge_error": null,
-      "answer": "Unfortunately, the tool output does not contain any information about total revenue for Nvidia.\n\nHowever, let me try again to call the `query_financial_reports` tool specifically for the total revenue of Nvidia.",
-      "latency_sec": 57.97624206542969,
+      "answer": "According to Nvidia's financial statements, the company does not provide a specific total revenue figure in its most recent 10-K filing. However, it mentions that revenue recognition is based on historical facts and various assumptions, and actual results may differ materially from these estimates. The available information does not specify the exact range of total revenue for Nvidia.",
+      "latency_sec": 28.210795164108276,
       "tool_calls_count": 1
     },
     {
@@ -704,16 +703,19 @@
       "retrieval_hit": true,
       "retrieval_citations": [
         "Pfizer 10-K FY2024 \u2013 Financial Statements",
-        "Pfizer 10-K FY2023 \u2013 Financial Statements"
+        "Pfizer 10-K FY2025 \u2013 Financial Statements"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
-      "grounded": true,
-      "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately states that the net income in the Biopharma segment is $30.632 billion and the net loss in Other business activities is $19.050 billion, both of which are directly supported by the provided CONTEXT.",
+      "grounded": false,
+      "unsupported_claims": [
+        "Net income for the year ended December 31, 2023 was $9,562 million.",
+        "This represents a decrease from $92,631 million in 2022."
+      ],
+      "judge_reasoning": "The answer states that net income for 2023 was $9,562 million and decreased from $92,631 million in 2022, but the context only shows net income before allocation to noncontrolling interests as $2,158 million for 2023.",
       "judge_error": null,
-      "answer": "According to Pfizer's 10-K filing for the year ended December 31, 2023, the net income is $30.632 billion in the Biopharma segment and a net loss of $19.050 billion in Other business activities.",
-      "latency_sec": 58.240957260131836,
+      "answer": "**Section 1: Pfizer's Income Statement**\n\n* Net income for the year ended December 31, 2023 was $9,562 million.\n* This represents a decrease from $92,631 million in 2022.\n\n**Section 2: Comparison to Prior Year**\n\n* The net income for the year ended December 31, 2024 is not available as it is not indexed.",
+      "latency_sec": 36.18331789970398,
       "tool_calls_count": 1
     },
     {
@@ -728,16 +730,16 @@
       "routing_section_correct": true,
       "retrieval_hit": true,
       "retrieval_citations": [
-        "ExxonMobil 10-K FY2023 \u2013 Financial Statements"
+        "ExxonMobil 10-K FY2025 \u2013 Financial Statements"
       ],
       "retrieval_note": "",
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The claim about capital and exploration expenditures is supported by section 63 of the Financial Section.",
+      "judge_reasoning": "The answer accurately reflects the content of Note 16, which discusses capital expenditures and litigation-related uncertainties.",
       "judge_error": null,
-      "answer": "According to ExxonMobil's 10-K filing for the fiscal year 2023, capital and exploration expenditures were $16.2 billion. This includes both capital expenditures and exploration expenses.",
-      "latency_sec": 82.66903972625732,
+      "answer": "According to ExxonMobil's financial statements, capital expenditures are disclosed in Note 16 of the financial statements. The note discusses various claims made against ExxonMobil and its subsidiaries in pending lawsuits, but does not believe these will have a material adverse effect on its operations or financial condition. Additionally, the note mentions that there are no events or uncertainties beyond those already included in reported financial information that would indicate a material change in future operating results or financial condition.",
+      "latency_sec": 33.807257890701294,
       "tool_calls_count": 1
     }
   ],
