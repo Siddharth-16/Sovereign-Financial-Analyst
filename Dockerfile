@@ -13,6 +13,12 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+ENV HF_HOME=/srv/.cache/huggingface
+ARG EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBED_MODEL}')"
+
+ENV HF_HUB_OFFLINE=1
+
 COPY app ./app
 COPY api ./api
 COPY ui ./ui
@@ -20,7 +26,6 @@ COPY scripts ./scripts
 COPY docker ./docker
 RUN chmod +x ./docker/entrypoint-api.sh ./docker/entrypoint-ui.sh
 
-# Non-root runtime user.
 RUN useradd --create-home --uid 1000 appuser
 RUN mkdir -p /srv/chroma_db && chown -R appuser:appuser /srv
 USER appuser

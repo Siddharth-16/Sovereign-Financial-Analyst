@@ -12,6 +12,7 @@ from app.config import FINANCIAL_KEYWORDS
 from app.companies import COMPANY_NAME_MAP as COMPANY_ALIASES
 from app.exceptions import OllamaUnavailableError
 from app.llm import get_llm
+import time as _time
 
 logger = logging.getLogger("sovereign_fa.agent")
 
@@ -20,7 +21,6 @@ llm = get_llm()
 NORMALIZED_TICKER_MAP = {k.lower(): v for k, v in TICKER_TO_COMPANY.items()}
 
 def invoke_llm_with_retry(messages: list[dict], retries: int = 2, backoff_seconds: float = 1.5) -> str:
-    import time as _time
 
     last_exc: Optional[Exception] = None
     for attempt in range(retries + 1):
@@ -418,11 +418,16 @@ def ask_agent(
 
     if needs_filings:
         section = infer_section(effective_input)
+        _retrieval_start = _time.perf_counter()
         filing_result = query_financial_reports(
             query=effective_input,
             company=active_company,
             fiscal_year=None,
             section=section,
+        )
+        logger.info(
+            "retrieval_timing",
+            extra={"retrieval_ms": round((_time.perf_counter() - _retrieval_start) * 1000, 1)},
         )
         filing_context = filing_result.get("content")
         filing_citations = filing_result.get("citations", [])
@@ -433,6 +438,8 @@ def ask_agent(
             stock_result = get_stock_performance(ticker)
             stock_context = stock_result.get("data")
             stock_citation = stock_result.get("citation")
+    
+    _llm_start = _time.perf_counter()
 
     reply = build_answer(
         user_input=effective_input,
@@ -441,6 +448,10 @@ def ask_agent(
         filing_citations=filing_citations,
         stock_context=stock_context,
         stock_citation=stock_citation,
+    )
+    logger.info(
+        "llm_synthesis_timing",
+        extra={"llm_ms": round((_time.perf_counter() - _llm_start) * 1000, 1)},
     )
 
     return reply, active_company

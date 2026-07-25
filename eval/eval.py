@@ -48,12 +48,30 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from app.agent import extract_company, infer_section, ask_agent, llm  
+from app.agent import extract_company, infer_section, ask_agent
 from app.agentic_router import run_agentic_query
-from app.tools import query_financial_reports, normalize_company 
-from app.companies import SLUG_TO_DISPLAY, SECTION_DISPLAY_MAP  
+from app.tools import query_financial_reports, normalize_company
+from app.companies import SLUG_TO_DISPLAY, SECTION_DISPLAY_MAP
 
-from dataset import EVAL_QUESTIONS  
+from dataset import EVAL_QUESTIONS
+
+JUDGE_LLM_PROVIDER = os.getenv("JUDGE_LLM_PROVIDER", "groq" if os.getenv("GROQ_API_KEY") else "ollama")
+JUDGE_OLLAMA_MODEL = os.getenv("JUDGE_OLLAMA_MODEL", "llama3.1")
+JUDGE_GROQ_MODEL = os.getenv("JUDGE_GROQ_MODEL", "llama-3.1-8b-instant")
+
+
+def _build_judge_llm():
+    if JUDGE_LLM_PROVIDER == "groq":
+        from langchain_groq import ChatGroq
+
+        return ChatGroq(model=JUDGE_GROQ_MODEL, temperature=0)
+    from langchain_ollama import ChatOllama
+    from app.config import OLLAMA_BASE_URL
+
+    return ChatOllama(model=JUDGE_OLLAMA_MODEL, base_url=OLLAMA_BASE_URL, temperature=0)
+
+
+judge_llm = _build_judge_llm()  
 
 
 # --------------------------------------------------------------------------- data
@@ -275,7 +293,7 @@ ANSWER:
 
 Return the JSON verdict now.
 """
-    response = llm.invoke(
+    response = judge_llm.invoke(
         [
             {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
@@ -286,9 +304,17 @@ Return the JSON verdict now.
 
     try:
         parsed = json.loads(cleaned)
+        grounded = bool(parsed.get("grounded"))
+        unsupported_claims = list(parsed.get("unsupported_claims", []))
+        if grounded and unsupported_claims:
+            # Self-contradictory verdict: the judge listed a real unsupported
+            # claim but still marked the answer grounded. Treat as ungrounded
+            # rather than silently trusting the boolean -- this exact failure
+            # mode is what inflated a prior report to a false 1.0 score.
+            grounded = False
         return {
-            "grounded": bool(parsed.get("grounded")),
-            "unsupported_claims": list(parsed.get("unsupported_claims", [])),
+            "grounded": grounded,
+            "unsupported_claims": unsupported_claims,
             "reasoning": str(parsed.get("reasoning", "")),
             "error": None,
         }

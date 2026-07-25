@@ -1,4 +1,5 @@
 {
+  "mode": "rule_based",
   "summary": {
     "total_questions": 28,
     "routing_company_accuracy": 1.0,
@@ -10,16 +11,18 @@
     "groundedness_graded": 28,
     "groundedness_score": 0.929,
     "judge_errors": 0,
+    "avg_tool_calls_per_question": 0.0,
+    "questions_with_zero_tool_calls": 28,
     "by_category": {
       "business": {
         "total": 7,
         "retrieval_recall_at_k": 1.0,
-        "groundedness_score": 1.0
+        "groundedness_score": 0.857
       },
       "risk_factors": {
         "total": 7,
         "retrieval_recall_at_k": 1.0,
-        "groundedness_score": 0.714
+        "groundedness_score": 0.857
       },
       "mdna": {
         "total": 7,
@@ -51,12 +54,15 @@
       ],
       "retrieval_note": "",
       "groundedness_run": true,
-      "grounded": true,
-      "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects that main business segments are not explicitly stated and describes core products based on provided context.",
+      "grounded": false,
+      "unsupported_claims": [
+        "Nvidia's main business segments are: 1. Datacenter, 2. Gaming, 3. Professional Visualization"
+      ],
+      "judge_reasoning": "The provided context does not mention 'Gaming' and 'Professional Visualization' as separate business segments.",
       "judge_error": null,
-      "answer": "Nvidia's main business segments are not explicitly stated in the provided filing. However, based on the description of its full-stack computing infrastructure and offerings, it appears that the company operates as a single segment.\n\nThe company describes its core products as including:\n\n* CUDA programming model\n* Domain-specific software libraries\n* Software development kits (SDKs)\n* Application Programming Interfaces (APIs)\n\nThese products accelerate performance and ease deployment for computationally intensive workloads such as artificial intelligence, data analytics, scientific computing, and 3D graphics.\n\nSources:\n\u2022 Nvidia 10-K FY2024 \u2013 Business\n\u2022 Nvidia 10-K FY2025 \u2013 Business",
-      "latency_sec": 105.05209183692932
+      "answer": "Nvidia's main business segments are:\n\n1. Datacenter\n2. Gaming\n3. Professional Visualization\n\nThe company describes its core products as being based on the foundational CUDA programming model that runs on all NVIDIA GPUs, along with hundreds of domain-specific software libraries, software development kits, or SDKs, and Application Programming Interfaces, or APIs.\n\nSources:\n\u2022 Nvidia 10-K FY2024 \u2013 Business\n\u2022 Nvidia 10-K FY2025 \u2013 Business",
+      "latency_sec": 26.146624088287354,
+      "tool_calls_count": 0
     },
     {
       "id": "biz-02",
@@ -77,10 +83,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information presented in the provided context, including the company's focus on growing manufacturing capacity and ramping up production of electric vehicles, as well as its primary product lines.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the context, including the company's business model and primary product lines.",
       "judge_error": null,
-      "answer": "Tesla's business model is focused on growing its manufacturing capacity and ramping up production of electric vehicles, including the Model 3, Y, S, X, Cybertruck, Tesla Semi, and next-generation platform. The company aims to improve vehicle performance, decrease production costs, and increase affordability and customer awareness.\n\nThe primary product lines are:\n\n1. Electric vehicles: consumer vehicles such as Model 3, Y, S, and X, as well as commercial electric vehicles like the Tesla Semi.\n2. Energy Generation and Storage: energy storage products (no specific details provided).\n\nSources:\n\u2022 Tesla 10-K FY2024 \u2013 Business\n\u2022 Tesla 10-K FY2023 \u2013 Business",
-      "latency_sec": 97.5976791381836
+      "answer": "Tesla's business model is focused on growing its manufacturing capacity, improving vehicle performance, decreasing production costs, and increasing affordability and customer awareness. The company's primary product lines include:\n\n1. Passenger vehicles: Model 3, Model Y, Model S, and Model X\n2. Commercial electric vehicles: Tesla Semi\n3. Energy generation and storage products: Energy Storage Products\n\nSources:\n\u2022 Tesla 10-K FY2024 \u2013 Business\n\u2022 Tesla 10-K FY2023 \u2013 Business",
+      "latency_sec": 29.74070906639099,
+      "tool_calls_count": 0
     },
     {
       "id": "biz-03",
@@ -100,10 +107,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately lists the four major reportable business segments mentioned in the provided context.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the CONTEXT about JPMorgan Chase's reportable business segments.",
       "judge_error": null,
-      "answer": "JPMorgan Chase's main reportable business segments are:\n\n1. Consumer & Community Banking (CCB)\n2. Corporate & Investment Bank (CIB)\n3. Commercial Banking (CB)\n4. Asset & Wealth Management (AWM)\n\nSources:\n\u2022 JPMorgan Chase 10-K FY2023 \u2013 Business",
-      "latency_sec": 70.34749007225037
+      "answer": "JPMorgan Chase's main reportable business segments are:\n\n1. Consumer & Community Banking (CCB) - consumer business\n2. Corporate & Investment Bank (CIB) - wholesale business\n3. Commercial Banking (CB) - wholesale business\n4. Asset & Wealth Management (AWM) - wholesale business\n\nSources:\n\u2022 JPMorgan Chase 10-K FY2023 \u2013 Business",
+      "latency_sec": 32.180261850357056,
+      "tool_calls_count": 0
     },
     {
       "id": "biz-04",
@@ -127,8 +135,9 @@
       "unsupported_claims": [],
       "judge_reasoning": "The answer accurately reflects the business strategy and store formats described in the provided context.",
       "judge_error": null,
-      "answer": "Walmart describes its business strategy as developing technology tools and services to better serve customers and help stores operate more efficiently, such as pickup and delivery, Walmart+, ship-from-store and other initiatives which provide convenient and seamless omni-channel shopping experiences.\n\nThe company operates through various store formats, including supercenters, discount stores, neighborhood markets, supermarkets, hypermarkets, warehouse clubs (including Sam's Clubs), cash & carry, and eCommerce platforms. \n\nSources:\n\u2022 Walmart 10-K FY2024 \u2013 Business\n\u2022 Walmart 10-K FY2025 \u2013 Business\n\u2022 Walmart 10-K FY2023 \u2013 Business",
-      "latency_sec": 92.4330780506134
+      "answer": "Walmart describes its business strategy as focusing on providing customers with convenient and seamless shopping experiences through various store formats, including supercenters, discount stores, neighborhood markets, and eCommerce platforms. The company aims to serve customers 24 hours a day through its online and mobile channels.\n\nThe company's store formats are designed to cater to different customer needs, with Walmart U.S. offering supercenters, discount stores, and neighborhood markets, while Walmart International offers various retail and wholesale formats, including supercenters, supermarkets, hypermarkets, warehouse clubs, and eCommerce platforms.\n\nSources:\n\u2022 Walmart 10-K FY2024 \u2013 Business\n\u2022 Walmart 10-K FY2023 \u2013 Business",
+      "latency_sec": 28.327412128448486,
+      "tool_calls_count": 0
     },
     {
       "id": "biz-05",
@@ -148,13 +157,12 @@
       "retrieval_note": "",
       "groundedness_run": true,
       "grounded": true,
-      "unsupported_claims": [
-        "Diabetes, Obesity and Other Cardiometabolic products"
-      ],
-      "judge_reasoning": "The answer lists 'Diabetes, Obesity and Other Cardiometabolic products' as a therapeutic area, but the context only mentions it once in a list of indications for a specific product (Basaglar), not as a main therapeutic area.",
+      "unsupported_claims": [],
+      "judge_reasoning": "The answer accurately reflects the information provided in the CONTEXT, specifically mentioning Diabetes and Cardiometabolic products as therapeutic areas, which is consistent across all excerpts.",
       "judge_error": null,
-      "answer": "Eli Lilly's main therapeutic areas are:\n\n1. Cardiometabolic Health (including diabetes and obesity)\n2. Diabetes, Obesity and Other Cardiometabolic products\n\nThe company operates in a single business segment: human pharmaceutical products.\n\nSources:\n\u2022 Eli Lilly 10-K FY2024 \u2013 Business\n\u2022 Eli Lilly 10-K FY2025 \u2013 Business",
-      "latency_sec": 86.28293085098267
+      "answer": "Eli Lilly's main therapeutic areas are:\n\n1. Diabetes\n2. Obesity and Other Cardiometabolic products\n\nThe company operates in a single business segment: human pharmaceutical products.\n\nSources:\n\u2022 Eli Lilly 10-K FY2024 \u2013 Business\n\u2022 Eli Lilly 10-K FY2025 \u2013 Business",
+      "latency_sec": 21.553897857666016,
+      "tool_calls_count": 0
     },
     {
       "id": "biz-06",
@@ -178,7 +186,8 @@
       "judge_reasoning": "The answer accurately reflects the information provided in the CONTEXT, listing the three reportable segments mentioned.",
       "judge_error": null,
       "answer": "Boeing's primary business segments are:\n\n1. Commercial Airplanes (BCA)\n2. Defense, Space & Security (BDS)\n3. Global Services (BGS)\n\nSources:\n\u2022 Boeing 10-K FY2024 \u2013 Business\n\u2022 Boeing 10-K FY2025 \u2013 Business",
-      "latency_sec": 54.040518283843994
+      "latency_sec": 21.548759698867798,
+      "tool_calls_count": 0
     },
     {
       "id": "biz-07",
@@ -198,10 +207,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the provided context, describing Visa's core business and revenue model without making any unsupported claims.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the context about Visa's core business and revenue model.",
       "judge_error": null,
-      "answer": "Visa describes its core business as facilitating money movement across more than 200 countries and territories among a global set of consumers, merchants, financial institutions, and government entities through innovative technologies. Its revenue model is based on earning revenue from services provided in support of client usage of Visa payment services, including:\n\n* Service Revenues: Earned for services provided in support of client usage of Visa payment services\n* Other Revenues: Consist mainly of value added services related to advisory, marketing and certain card benefits; license fees for use of the Visa brand or technology; and fees for account holder services, certification and licensing\n* Data Processing Revenues: Earned for authorization, clearing, settlement; value added services related to issuing, acceptance, and risk and identity solutions; network access; and other maintenance and support services that facilitate transaction and information processing among our clients globally\n\nSources:\n\u2022 Visa 10-K FY2023 \u2013 Business",
-      "latency_sec": 112.57958197593689
+      "answer": "Visa's core business is facilitating money movement across more than 200 countries and territories among a global set of consumers, merchants, financial institutions, and government entities through innovative technologies. Its revenue model consists of service revenues earned for services provided in support of client usage of Visa payment services, other revenues consisting mainly of value-added services related to advisory, marketing, and certain card benefits, license fees for use of the Visa brand or technology, and fees for account holder services, certification, and licensing.\n\nSources:\n\u2022 Visa 10-K FY2023 \u2013 Business",
+      "latency_sec": 24.251832008361816,
+      "tool_calls_count": 0
     },
     {
       "id": "risk-01",
@@ -221,10 +231,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the two supply chain risks disclosed in the provided CONTEXT.",
+      "judge_reasoning": "The answer accurately reflects the two specific supply chain risks mentioned in the provided CONTEXT.",
       "judge_error": null,
-      "answer": "Nvidia discloses two supply chain risks in its 10-K:\n\n1. Failure to estimate customer demand properly, which has led and could lead to mismatches between supply and demand.\n2. Misalignment of inventory or supply commitments with demand for our products, which may result in inventory provisions.\n\nSources:\n\u2022 Nvidia 10-K FY2023 \u2013 Risk Factors",
-      "latency_sec": 61.942731857299805
+      "answer": "Nvidia discloses two supply chain risks in its 10-K filing:\n\n1. Failure to estimate customer demand properly, which could lead to mismatches between supply and demand.\n2. Supply chain conditions, complexity of products, and recent reductions in demand, leading to significant growth in inventory on hand, purchase obligations, and prepaid supply agreements.\n\nSources:\n\u2022 Nvidia 10-K FY2023 \u2013 Risk Factors",
+      "latency_sec": 23.295438766479492,
+      "tool_calls_count": 0
     },
     {
       "id": "risk-02",
@@ -244,10 +255,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "All claims made in ANSWER are supported by CONTEXT, which explicitly mentions changing regulations related to export and import, potential liabilities due to environmental and social considerations, and reputational harm from non-compliance.",
+      "judge_reasoning": "The answer accurately reflects the regulatory risks mentioned in the provided context.",
       "judge_error": null,
-      "answer": "Regulatory risks highlighted by Apple related to its global operations include:\n\n1. Changing regulations relating to the export and import of its products, which could result in products being banned, delayed, or prohibited from importation.\n2. Potential liabilities and increased costs due to expectations relating to environmental, social, and governance considerations and related reporting obligations.\n3. Reputational harm resulting from non-compliance with regulatory requirements.\n\nSources:\n\u2022 Apple 10-K FY2024 \u2013 Risk Factors",
-      "latency_sec": 61.57981991767883
+      "answer": "Regulatory risks highlighted by Apple related to its global operations include:\n\n1. Changing regulations relating to the export and import of its products.\n2. Compliance with environmental, social, and governance considerations and related reporting obligations.\n\nSources:\n\u2022 Apple 10-K FY2024 \u2013 Risk Factors\n\u2022 AAPL market data \u2013 latest 5d window",
+      "latency_sec": 25.281277179718018,
+      "tool_calls_count": 0
     },
     {
       "id": "risk-03",
@@ -267,10 +279,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the risks discussed in the provided context.",
+      "judge_reasoning": "The provided answer accurately reflects the manufacturing and production risks discussed in the given context.",
       "judge_error": null,
-      "answer": "Tesla discusses the following manufacturing and production risks:\n\n1. Delays in scaling manufacturing, delivery, and service operations to meet demand.\n2. Uncertainty regarding the future of electric vehicles or other products and services.\n3. Quarterly production and sales performance compared with market expectations.\n\nSources:\n\u2022 Tesla 10-K FY2023 \u2013 Risk Factors",
-      "latency_sec": 46.14250183105469
+      "answer": "Manufacturing and production risks discussed by Tesla include:\n\n1. Delays in scaling manufacturing, delivery, and service operations to meet demand.\n2. Challenges in maintaining credibility and confidence among customers, suppliers, analysts, investors, ratings agencies, and other parties due to limited operating history relative to established competitors.\n\nSources:\n\u2022 Tesla 10-K FY2023 \u2013 Risk Factors",
+      "latency_sec": 29.732598066329956,
+      "tool_calls_count": 0
     },
     {
       "id": "risk-04",
@@ -293,8 +306,9 @@
       "unsupported_claims": [],
       "judge_reasoning": "The answer accurately reflects the disclosed environmental and regulatory risks in the provided context.",
       "judge_error": null,
-      "answer": "ExxonMobil discloses the following environmental and regulatory risks:\n\n1. Changes in environmental regulations or other laws that increase its cost of operation or compliance, such as those affecting offshore drilling operations, water use, emissions, hydraulic fracturing, or production or use of new or recycled plastics.\n2. Increases in taxes, duties, or government royalty rates on oil, gas and petrochemical operations.\n3. Changes in policy that could adversely affect its results, including price controls.\n\nSources:\n\u2022 ExxonMobil 10-K FY2024 \u2013 Risk Factors\n\u2022 ExxonMobil 10-K FY2023 \u2013 Risk Factors",
-      "latency_sec": 73.73720693588257
+      "answer": "ExxonMobil discloses environmental and regulatory risks, specifically:\n\n1. Changes in environmental regulations or other laws that increase their cost of operation or compliance or reduce or delay available business opportunities.\n2. Increases in taxes, duties, or government royalty rates (including retroactive claims or punitive taxes on oil, gas and petrochemical operations).\n3. Price controls.\n\nSources:\n\u2022 ExxonMobil 10-K FY2024 \u2013 Risk Factors\n\u2022 ExxonMobil 10-K FY2023 \u2013 Risk Factors",
+      "latency_sec": 24.293953895568848,
+      "tool_calls_count": 0
     },
     {
       "id": "risk-05",
@@ -315,12 +329,14 @@
       "groundedness_run": true,
       "grounded": false,
       "unsupported_claims": [
-        "Uncertainty in complying with new restrictions and requirements under the DMA."
+        "Uncertainty around future regulatory actions and their impact on Meta's business.",
+        "Compliance with emerging regulations and laws that may require changes in how Meta collects, uses, or discloses user data."
       ],
-      "judge_reasoning": "The provided context only mentions potential future changes to existing restrictions, but does not mention uncertainty in complying with new restrictions.",
+      "judge_reasoning": "The provided context only mentions the DMA as a specific example of evolving regulation, but does not mention uncertainty around future regulatory actions or compliance with emerging regulations.",
       "judge_error": null,
-      "answer": "Meta describes risks related to data privacy and regulation as:\n\n1. Regulatory and legislative privacy requirements constantly evolving, subject to significant change, and uncertain interpretation.\n2. Restrictions and requirements under the DMA, including combination of data across services and product design, which may be subject to further interpretation and regulatory engagement.\n3. Uncertainty in complying with new restrictions and requirements under the DMA.\n\nSources:\n\u2022 Meta 10-K FY2025 \u2013 Risk Factors\n\u2022 Meta 10-K FY2023 \u2013 Risk Factors",
-      "latency_sec": 53.72882604598999
+      "answer": "Meta describes the following risks related to data privacy and regulation:\n\n1. Regulatory and legislative privacy requirements are constantly evolving and can be subject to significant change and uncertain interpretation, including restrictions under the DMA on areas such as data combination across services and product design.\n2. Uncertainty around future regulatory actions and their impact on Meta's business.\n3. Compliance with emerging regulations and laws that may require changes in how Meta collects, uses, or discloses user data.\n\nSources:\n\u2022 Meta 10-K FY2025 \u2013 Risk Factors\n\u2022 Meta 10-K FY2023 \u2013 Risk Factors",
+      "latency_sec": 22.9663348197937,
+      "tool_calls_count": 0
     },
     {
       "id": "risk-06",
@@ -339,15 +355,13 @@
       ],
       "retrieval_note": "",
       "groundedness_run": true,
-      "grounded": false,
-      "unsupported_claims": [
-        "Receiving or maintaining favorable recommendations from technical or advisory committees, such as the ACIP or FDA Advisory Committee, which may impact product sales and regulatory approvals.",
-        "Regulatory agency requirements resulting in a more challenging, expensive, and lengthy regulatory approval process due to requests for additional or more extensive clinical trials."
-      ],
-      "judge_reasoning": "The provided context only mentions risk factors related to litigation, government investigations, and commercial matters, but does not explicitly mention the impact of technical or advisory committee recommendations on product sales and regulatory approvals, nor the specific challenges posed by regulatory agency requirements in the approval process.",
+      "grounded": true,
+      "unsupported_claims": [],
+      "judge_reasoning": "The answer accurately reflects the risk factors related to drug development and clinical trials disclosed by Pfizer in the provided 10-K excerpts.",
       "judge_error": null,
-      "answer": "Pfizer discloses several risk factors related to drug development and clinical trials, including:\n\n1. Receiving or maintaining favorable recommendations from technical or advisory committees, such as the ACIP or FDA Advisory Committee, which may impact product sales and regulatory approvals.\n2. Claims and concerns regarding the safety and efficacy of in-line products and product candidates, potentially leading to product recalls, withdrawals, litigation, and decreased sales.\n3. Regulatory agency requirements resulting in a more challenging, expensive, and lengthy regulatory approval process due to requests for additional or more extensive clinical trials.\n\nSources:\n\u2022 Pfizer 10-K FY2024 \u2013 Risk Factors\n\u2022 Pfizer 10-K FY2023 \u2013 Risk Factors",
-      "latency_sec": 73.30734205245972
+      "answer": "Pfizer discloses the following risk factors related to drug development and clinical trials:\n\n1. Product liability and other product-related litigation, including claims related to medical causation, label warnings, scientific evidence, actual injury, and other matters.\n2. Commercial and other asserted or unasserted matters, such as acquisition-, licensing-, intellectual property-, collaboration- or co-promotion-related claims and environmental claims.\n3. Government investigations, often related to the extensive regulation of pharmaceutical companies by national, state, and local government agencies.\n\nSources:\n\u2022 Pfizer 10-K FY2024 \u2013 Risk Factors\n\u2022 Pfizer 10-K FY2023 \u2013 Risk Factors",
+      "latency_sec": 27.655235767364502,
+      "tool_calls_count": 0
     },
     {
       "id": "risk-07",
@@ -370,8 +384,9 @@
       "unsupported_claims": [],
       "judge_reasoning": "The answer accurately reflects the risk factors disclosed in the provided context.",
       "judge_error": null,
-      "answer": "General Electric discloses several risk factors related to its industrial operations, including:\n\n1. Disruptions in deliveries and production due to supplier performance issues or natural disasters.\n2. Dependence on limited- or sole-source suppliers, which can limit GE's ability to meet customer commitments.\n3. Internal dependencies on key manufacturing facilities, which can be disrupted by capacity constraints, price increases, or decreased availability of raw materials.\n\nSources:\n\u2022 General Electric 10-K FY2023 \u2013 Risk Factors\n\u2022 General Electric 10-K FY2024 \u2013 Risk Factors",
-      "latency_sec": 119.59627604484558
+      "answer": "General Electric discloses the following risk factors related to its industrial operations:\n\n1. Disruptions in deliveries, capacity constraints, production disruptions up- or down-stream, price increases, or decreased availability of raw materials or commodities due to war, natural disasters (including the effects of climate change), actual or threatened public health pandemics or emergencies.\n2. Quality, capability, compliance and sourcing issues experienced by third-party providers that can adversely affect costs, margin operations and financial performance for some period of time.\n3. Dependence on limited- or sole-source suppliers, which can impact the company's ability to meet its obligations to customers due to performance, product quality and stability issues.\n\nSources:\n\u2022 General Electric 10-K FY2023 \u2013 Risk Factors\n\u2022 General Electric 10-K FY2024 \u2013 Risk Factors",
+      "latency_sec": 27.473891019821167,
+      "tool_calls_count": 0
     },
     {
       "id": "mdna-01",
@@ -391,10 +406,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the CONTEXT about revenue growth drivers for the More Personal Computing segment.",
+      "judge_reasoning": "The answer accurately reflects that revenue growth drivers are not explicitly stated in the provided context, and only mentions the segments mentioned in the MD&A.",
       "judge_error": null,
-      "answer": "The Management's Discussion and Analysis (MD&A) section of Microsoft's FY2025 10-K filing mentions that revenue growth in the More Personal Computing segment was driven by \"Windows OEM and Devices revenue growth\" and \"Xbox content and services revenue growth\". \n\nSources:\n\u2022 Microsoft 10-K FY2025 \u2013 MD&A",
-      "latency_sec": 75.3020532131195
+      "answer": "The MD&A section of Microsoft's FY2025 10-K filing does not explicitly state revenue growth drivers. However, it mentions that the company's More Personal Computing segment assesses the performance of its key consumer businesses, which includes Windows OEM and Devices, Xbox content and services, search and news advertising.\n\nSources:\n\u2022 Microsoft 10-K FY2025 \u2013 MD&A",
+      "latency_sec": 22.69925880432129,
+      "tool_calls_count": 0
     },
     {
       "id": "mdna-02",
@@ -414,10 +430,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer honestly states that no filing data is available, which matches the provided context.",
+      "judge_reasoning": "The answer accurately reflects that MD&A discusses general factors affecting operating margins but does not provide specific details due to lack of filing data.",
       "judge_error": null,
-      "answer": "Unfortunately, I am unable to provide information on Amazon's MD&A discussion of operating margin trends as no filing data is available.",
-      "latency_sec": 25.12006711959839
+      "answer": "Amazon's Management's Discussion and Analysis (MD&A) section typically discusses operating margin trends in relation to the company's overall financial performance, including factors such as revenue growth, cost structure, and pricing strategies. However, since no filing data is available, specific details about Amazon's operating margin trends are not available.\n\nSources:\n* None",
+      "latency_sec": 14.758641242980957,
+      "tool_calls_count": 0
     },
     {
       "id": "mdna-03",
@@ -438,10 +455,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reports revenue trends by segment as stated in the provided context.",
+      "judge_reasoning": "The answer accurately reflects the revenue trends by segment as stated in the provided CONTEXT.",
       "judge_error": null,
-      "answer": "AMD's MD&A reports that revenue trends by segment are as follows:\n\n* Data Center: $16.6 billion in 2025, increasing 32% from $12.6 billion in 2024\n* Client and Gaming: $14.6 billion in 2025, increasing 51% from $9.6 billion in 2024\n* Embedded: $3.5 billion in 2025, decreasing 3% from $3.6 billion in 2024\n\nSources:\n\u2022 AMD 10-K FY2025 \u2013 MD&A\n\u2022 AMD 10-K FY2024 \u2013 MD&A",
-      "latency_sec": 109.2859239578247
+      "answer": "The MD&A section of AMD's 10-K FY2025 filing reports that revenue trends by segment are as follows:\n\n- Data Center segment net revenue increased by 32% in 2025 compared to 2024, primarily driven by strong demand for 5th generation AMD EPYC processors and AMD Instinct MI350 Series GPUs.\n- Client and Gaming segment net revenue increased by 51% in 2025 compared to 2024, primarily driven by strong demand for AMD Ryzen processors, semi-custom game consoles SoCs, and Radeon gaming GPUs.\n- Embedded segment net revenue decreased by 3% in 2025 compared to 2024, as certain end market demand remained mixed.\n\nSources:\n\u2022 AMD 10-K FY2025 \u2013 MD&A\n\u2022 AMD 10-K FY2024 \u2013 MD&A",
+      "latency_sec": 30.846905946731567,
+      "tool_calls_count": 0
     },
     {
       "id": "mdna-04",
@@ -462,10 +480,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer honestly states that no filing data is available, which matches the provided context.",
+      "judge_reasoning": "The answer states that Broadcom's MD&A discussion on gross margin trends is not available, which aligns with the provided context.",
       "judge_error": null,
-      "answer": "Unfortunately, I am unable to provide information on Broadcom's MD&A discussion of gross margin trends as no filing data is available.",
-      "latency_sec": 22.36960506439209
+      "answer": "Broadcom's MD&A discussion on gross margin trends is not available as no filing data is available.\n\nSources:\n* None",
+      "latency_sec": 10.388800144195557,
+      "tool_calls_count": 0
     },
     {
       "id": "mdna-05",
@@ -486,10 +505,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the CONTEXT about sales and revenue trends for both 2022 and 2023.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the MD&A section of Caterpillar's 10-K reports for FY2023 and FY2024.",
       "judge_error": null,
-      "answer": "Caterpillar's MD&A reports that total sales and revenues increased by 17% in 2022 compared to 2021, primarily due to favorable price realization and higher sales volume. In 2023, total sales and revenues increased by 13% compared to 2022, also driven by favorable price realization and higher sales volume.\n\nSources:\n\u2022 Caterpillar 10-K FY2023 \u2013 MD&A\n\u2022 Caterpillar 10-K FY2024 \u2013 MD&A",
-      "latency_sec": 70.9182939529419
+      "answer": "Caterpillar's consolidated sales and revenues increased by 13 percent in 2023 compared to 2022, with total sales and revenues reaching $67.060 billion. The increase was primarily due to favorable price realization and higher sales volume.\n\nSources:\n\u2022 Caterpillar 10-K FY2023 \u2013 MD&A\n\u2022 Caterpillar 10-K FY2024 \u2013 MD&A",
+      "latency_sec": 27.566495656967163,
+      "tool_calls_count": 0
     },
     {
       "id": "mdna-06",
@@ -511,8 +531,9 @@
       "unsupported_claims": [],
       "judge_reasoning": "The answer accurately reflects the information provided in the context about net interest income drivers.",
       "judge_error": null,
-      "answer": "The MD&A discusses that net interest income was $6.35 billion for 2023, a 17% decrease from 2022, primarily due to higher average interest rates affecting other interest-bearing liabilities and borrowings. This increase in interest expense was partially offset by higher interest income related to collateralized agreements and other assets.\n\nSources:\n\u2022 Goldman Sachs 10-K FY2024 \u2013 MD&A",
-      "latency_sec": 59.74059820175171
+      "answer": "Goldman Sachs' MD&A discusses net income drivers, specifically the significant increase in interest expense primarily related to other interest-bearing liabilities, deposits, collateralized financings, and borrowings, which was partially offset by a significant increase in interest income.\n\nSources:\n\u2022 Goldman Sachs 2023 Form 10-K\n\u2022 Goldman Sachs 10-K FY2024 \u2013 MD&A",
+      "latency_sec": 31.655874013900757,
+      "tool_calls_count": 0
     },
     {
       "id": "mdna-07",
@@ -532,10 +553,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects the information provided in the MD&A about factors affecting advertising revenue fluctuations.",
+      "judge_reasoning": "The answer accurately reflects the information provided in the MD&A section of Alphabet's 10-K report, specifically mentioning factors that affect advertising revenue trends.",
       "judge_error": null,
-      "answer": "The MD&A mentions that fluctuations in advertising revenues have been affected by various factors, including advertiser competition for keywords, changes in advertising quality and formats, seasonal fluctuations in internet usage and advertising expenditures, and traffic growth in emerging markets compared to more mature markets.\n\nSources:\n\u2022 Alphabet 10-K FY2024 \u2013 MD&A",
-      "latency_sec": 51.12165689468384
+      "answer": "Alphabet's advertising revenue trends have been affected by fluctuations in paid clicks and cost-per-click on Google Search & other properties, as well as changes in impressions and cost-per-impression on Google Network properties. The correlation between these items is also impacted by factors such as advertiser competition for keywords, changes in advertising quality, formats, delivery or policy, changes in device mix, seasonal fluctuations in internet usage, advertising expenditures, and underlying business trends.\n\nSources:\n\u2022 Alphabet 10-K FY2024 \u2013 MD&A",
+      "latency_sec": 30.453288078308105,
+      "tool_calls_count": 0
     },
     {
       "id": "fin-01",
@@ -555,10 +577,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects that the provided context does not contain any information about total assets, and instead states that both filing and stock data are unavailable.",
+      "judge_reasoning": "The answer states that Johnson & Johnson's financial statements are unavailable, which is consistent with the provided context.",
       "judge_error": null,
-      "answer": "Unfortunately, we are unable to determine Johnson & Johnson's total assets from the provided information as both filing and stock data is unavailable.",
-      "latency_sec": 17.47688603401184
+      "answer": "Johnson & Johnson's financial statements are not available due to unavailability of filing data.\n\nSources:\n\u2022 None",
+      "latency_sec": 10.820033073425293,
+      "tool_calls_count": 0
     },
     {
       "id": "fin-02",
@@ -579,10 +602,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects that the provided context does not contain any information about total liabilities.",
+      "judge_reasoning": "The answer accurately states that Walmart's total liabilities are not available, which is supported by the fact that no relevant information is provided in the context.",
       "judge_error": null,
-      "answer": "We are unable to determine Walmart's total liabilities from the provided information as both filing and stock data is unavailable.",
-      "latency_sec": 12.399732112884521
+      "answer": "Walmart's total liabilities are not available due to unavailability of filing data.\n\nSources:\n\u2022 None",
+      "latency_sec": 11.04592490196228,
+      "tool_calls_count": 0
     },
     {
       "id": "fin-03",
@@ -602,10 +626,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects that the provided context does not contain any information about cash flow from operations, and instead mentions supplemental disclosures for other items.",
+      "judge_reasoning": "The answer accurately reflects that no information about cash flow from operations is provided in the given context.",
       "judge_error": null,
-      "answer": "Unfortunately, no filing data is available to disclose information about cash flow from operations.\n\nSources:\n\u2022 V market data \u2013 latest 5d window",
-      "latency_sec": 32.52249479293823
+      "answer": "Visa's financial statements are not available due to unavailability of filing data. \n\nSources:\n* None",
+      "latency_sec": 11.39691710472107,
+      "tool_calls_count": 0
     },
     {
       "id": "fin-04",
@@ -625,10 +650,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately reflects that there is no information provided in the context about Boeing's balance sheet or debt levels.",
+      "judge_reasoning": "The answer accurately states that the provided context does not contain any information about Boeing's debt levels, and instead notes that no filing data is available.",
       "judge_error": null,
-      "answer": "Unfortunately, no information is available to discuss Boeing's balance sheet or debt levels.",
-      "latency_sec": 45.13682293891907
+      "answer": "Boeing's balance sheet does not provide information on its debt levels as no filing data is available.\n\nSources:\n* None",
+      "latency_sec": 10.935697317123413,
+      "tool_calls_count": 0
     },
     {
       "id": "fin-05",
@@ -648,10 +674,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer only states a fact that is supported by the context and does not make any claims that are contradicted or unsupported.",
+      "judge_reasoning": "The answer only states that total revenue is not directly stated, and correctly infers it from the 'Net income' section.",
       "judge_error": null,
-      "answer": "The total revenue is not directly stated in the provided filing. However, net income and adjustments to reconcile net income are reported. Net income for the year ended Jan 28, 2024 was $29,760 million.\n\nSources:\n\u2022 (7) \n\u2022 (2,783)\n\u2022 (395)",
-      "latency_sec": 104.21103000640869
+      "answer": "Nvidia's total revenue is not directly stated in the provided filing. However, we can infer that it is included in the \"Net income\" section of the consolidated statements of cash flows, which shows $29,760 million for the year ended Jan 28, 2024.\n\nSources:\n\u2022 Nvidia 10-K FY2024 \u2013 Financial Statements\n\u2022 Consolidated Statements of Cash Flows (In millions)",
+      "latency_sec": 27.81949210166931,
+      "tool_calls_count": 0
     },
     {
       "id": "fin-06",
@@ -672,10 +699,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer is supported by the provided context, specifically the Consolidated Statements of Comprehensive Income for 2023.",
+      "judge_reasoning": "The answer's figures match those found in the provided CONTEXT for 2023, 2022, and 2021.",
       "judge_error": null,
-      "answer": "Pfizer's income statement shows that net income attributable to Pfizer Inc. common shareholders was $2,158 million in 2023.\n\nSources:\n\u2022 Pfizer 10-K FY2024 \u2013 Financial Statements\n\u2022 Pfizer 10-K FY2025 \u2013 Financial Statements",
-      "latency_sec": 83.7035219669342
+      "answer": "Pfizer's income statement shows net income attributable to Pfizer Inc. common shareholders of $1.42 million in 2023, $0.38 million in 2022, and $5.59 million in 2021.\n\nSources:\n\u2022 Pfizer 10-K FY2024 \u2013 Financial Statements\n\u2022 Pfizer 10-K FY2023 \u2013 Financial Statements\n\u2022 Pfizer 10-K FY2022 \u2013 Financial Statements",
+      "latency_sec": 29.25733494758606,
+      "tool_calls_count": 0
     },
     {
       "id": "fin-07",
@@ -695,10 +723,11 @@
       "groundedness_run": true,
       "grounded": true,
       "unsupported_claims": [],
-      "judge_reasoning": "The answer accurately states that there is no information available about ExxonMobil's capital expenditures, which is consistent with the provided context.",
+      "judge_reasoning": "The answer states that no filing data is available, which is consistent with the provided context.",
       "judge_error": null,
-      "answer": "Unfortunately, no information is available regarding ExxonMobil's capital expenditures as both filing and stock data are unavailable.",
-      "latency_sec": 16.842968225479126
+      "answer": "ExxonMobil's financial statements do not disclose information on capital expenditures as no filing data is available.\n\nSources:\n* None",
+      "latency_sec": 10.994567155838013,
+      "tool_calls_count": 0
     }
   ],
   "status": "complete"
