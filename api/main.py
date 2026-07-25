@@ -19,6 +19,7 @@ Interactive docs: http://localhost:8000/docs
 from __future__ import annotations
 import asyncio
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -80,11 +81,17 @@ def _warmup() -> None:
         )
 
 
+WARMUP_ENABLED = os.getenv("WARMUP_ENABLED", "true").lower() not in ("false", "0", "no")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("startup", extra={})
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, _warmup)
+    if WARMUP_ENABLED:
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, _warmup)
+    else:
+        logger.info("warmup_skipped", extra={})
     yield
     logger.info("shutdown", extra={})
 
