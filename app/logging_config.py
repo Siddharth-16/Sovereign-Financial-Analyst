@@ -23,6 +23,8 @@ _STRUCTURED_FIELDS = (
     "company_slug",
     "error",
     "request_id",
+    "retrieval_ms",
+    "llm_ms",
 )
 
 
