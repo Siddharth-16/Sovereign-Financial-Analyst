@@ -17,6 +17,7 @@ Interactive docs: http://localhost:8000/docs
 """
 
 from __future__ import annotations
+import asyncio
 import logging
 import time
 import uuid
@@ -48,9 +49,42 @@ configure_logging()
 logger = logging.getLogger("sovereign_fa.api")
 
 
+def _warmup() -> None:
+    """Pre-load the embedding model, vectorstore, and LLM client so the
+    first real user query doesn't pay this cost. Runs in a thread so it
+    never blocks /health from responding.
+    """
+    start = time.perf_counter()
+    try:
+        from app.agent import invoke_llm_with_retry
+        from app.tools import query_financial_reports
+
+        for company in ("apple", "nvidia", "microsoft"):
+            try:
+                query_financial_reports(query="warmup", company=company, k=1)
+            except Exception as exc:  # noqa: BLE001 -- one bad company shouldn't abort warmup
+                logger.warning("warmup_retrieval_failed", extra={"company_slug": company, "error": str(exc)})
+
+        invoke_llm_with_retry(
+            [{"role": "user", "content": "Reply with the single word: ready"}],
+            retries=0,
+        )
+        logger.info(
+            "warmup_complete",
+            extra={"latency_ms": round((time.perf_counter() - start) * 1000, 1)},
+        )
+    except Exception as exc:  # noqa: BLE001 -- best-effort warmup, never fatal
+        logger.warning(
+            "warmup_failed",
+            extra={"error": str(exc), "latency_ms": round((time.perf_counter() - start) * 1000, 1)},
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("startup", extra={})
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, _warmup)
     yield
     logger.info("shutdown", extra={})
 
