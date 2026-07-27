@@ -52,37 +52,37 @@ It's also a deliberately end-to-end build: ingestion, retrieval, two routing str
 
 ```
                         +------------------+
-                        |   Streamlit UI    |
+                        |   Streamlit UI   |
                         +---------+--------+
                                   |
                         +---------v--------+
-                        |  FastAPI service   |   (api/main.py)
-                        |  /query /health     |
-                        |  /companies          |
+                        |  FastAPI service |   (api/main.py)
+                        |  /query /health  |
+                        |  /companies      |
                         +---------+--------+
                                   |
-                 +----------------+----------------+
-                 |                                   |
+                 +----------------+-----------------+
+                 |                                  |
         +--------v---------+              +---------v----------+
-        |  rule_based mode    |              |   agentic mode       |
-        |  (app/agent.py)     |              | (app/agentic_router)  |
-        |  keyword/regex        |              |  LLM tool-calling      |
-        |  routing                |              |  decides tool calls     |
+        |  rule_based mode |              |   agentic mode     |
+        |  (app/agent.py)  |              |(app/agentic_router)|
+        |  keyword/regex   |              |  LLM tool-calling  |
+        |  routing         |              | decides tool calls |
         +--------+---------+              +---------+----------+
-                 |                                   |
-                 +----------------+----------------+
+                 |                                  |
+                 +----------------+-----------------+
                                   |
-                 +----------------+----------------+
-                 |                                   |
-        +--------v---------+              +---------v----------+
-        | query_financial_    |              | get_stock_performance |
-        | reports (Chroma)    |              |      (yfinance)         |
+                 +----------------+-----------------+
+                 |                                  |
+        +--------v---------+              +---------v------------+
+        | query_financial_ |              | get_stock_performance|
+        | reports (Chroma) |              |      (yfinance)      |
         +--------+---------+              +----------------------+
                  |
         +--------v---------+
-        |  LLM synthesis      |   (Ollama, local -- or Groq, hosted)
-        |  with citations       |
-        +----------------------+
+        |  LLM synthesis   |   (Ollama, local -- or Groq, hosted)
+        |  with citations  |
+        +------------------+
 ```
 
 - **Ingestion** (`scripts/ingest.py`) pulls 10-K filings via the SEC API, splits them into sections (Business, Risk Factors, MD&A, Financial Statements) rather than treating a filing as one document, chunks each section, embeds the chunks, and persists them to a local ChromaDB store tagged with company, fiscal year, and section metadata.
@@ -100,7 +100,7 @@ The system supports two ways of deciding which tools to call for a given questio
 
 **`agentic`** -- the LLM itself decides which tools to call and with what arguments, via real LangChain tool-calling (`app/agentic_router.py`), not a scripted call sequence. Slower and, on the current small local model, somewhat less reliable at both company-name extraction and staying strictly within retrieved context -- but it's a genuine tool-calling agent, not a rule-based system dressed up as one.
 
-Both modes call the same underlying tools (`query_financial_reports`, `get_stock_performance`) and go through the same LLM-synthesis step; the only difference is how the decision to call a tool gets made. This distinction matters because a keyword router that never lets the model choose its own actions isn't accurately described as agentic -- a claim that doesn't survive a technical follow-up question is worse than no claim at all, so both modes exist, are separately evaluated, and are described here for what they actually are.
+Both modes call the same underlying tools (`query_financial_reports`, `get_stock_performance`) and go through the same LLM-synthesis step; the only difference is how the decision to call a tool gets made.
 
 ---
 
@@ -121,7 +121,7 @@ python eval/eval.py --mode both
 
 Produces `eval/report.json` and `eval/report_agentic.json` with full per-question results (routed company/section, retrieval hit/miss, groundedness verdict, cited unsupported claims where applicable, latency) alongside the summary above.
 
-**Reading the gap honestly:** agentic mode's two retrieval misses trace to a specific, real bug -- the LLM's tool-calling arguments sometimes include the full legal suffix (e.g. "tesla, inc." instead of "tesla"), which isn't normalized before the company lookup, so retrieval correctly returns nothing rather than silently guessing. That's a fixable normalization gap in the agentic path specifically, not a retrieval-index problem -- rule_based's keyword extraction doesn't hit this because it never passes free-form LLM-generated text through as a lookup key.
+**Reading the gap:** agentic mode's two retrieval misses trace to a specific, real bug -- the LLM's tool-calling arguments sometimes include the full legal suffix (e.g. "tesla, inc." instead of "tesla"), which isn't normalized before the company lookup, so retrieval correctly returns nothing rather than silently guessing. That's a fixable normalization gap in the agentic path specifically, not a retrieval-index problem -- rule_based's keyword extraction doesn't hit this because it never passes free-form LLM-generated text through as a lookup key.
 
 ---
 
@@ -223,7 +223,7 @@ docker compose --profile containerized-ollama up --build
 
 The API is containerized separately from the UI (`Dockerfile`, multi-stage, `api`/`ui` targets) so either can be deployed independently.
 
-### Render (no credit card required)
+### Render
 
 Connect the repo via the Render dashboard: **New -> Blueprint**. Render reads `render.yaml` and creates the service; you'll be prompted once for `GROQ_API_KEY` and `SEC_API_KEY`. The public deploy uses hosted inference (Groq) instead of Ollama, since a public URL can't require visitors to run a local model. Render's free tier doesn't require billing details, sleeps after 15 minutes of inactivity, and takes 30-60 seconds to wake on the next request.
 
@@ -329,12 +329,10 @@ fly.toml                        Fly.io deploy config (alternative)
 
 ## Known limitations
 
-Documented here rather than discovered by a reader mid-demo:
-
 - **Render's free tier (512MB) is tight for this stack.** `/health` and light traffic are fine; sustained real query traffic has triggered out-of-memory errors on that tier during testing. The application runs correctly end-to-end -- verified locally and via Docker -- the constraint is specifically the free-tier resource ceiling, not the code.
 - **Agentic mode's company-name normalization gap** (see Evaluation above) causes occasional retrieval misses when the LLM's tool-calling arguments include a legal suffix the lookup doesn't normalize away.
 - **One documented, repeatable hallucination pattern** on Pfizer risk-factor questions surfaced during evaluation and is tracked as a known limitation rather than silently accepted.
-- Financial-statement questions for companies whose statements weren't cleanly extracted during ingestion correctly return that a fact isn't available in the indexed filings rather than guessing -- by design, but worth knowing it happens for a subset of companies.
+- Financial-statement questions for companies whose statements weren't cleanly extracted during ingestion correctly return that a fact isn't available in the indexed filings rather than guessing
 
 ---
 
