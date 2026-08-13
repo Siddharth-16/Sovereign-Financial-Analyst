@@ -70,6 +70,25 @@ def clean_filing_text(text: str) -> str:
     return text.strip()
 
 
+_LEGAL_SUFFIXES = {
+    "inc", "incorporated", "corp", "corporation", "co", "company",
+    "ltd", "limited", "llc", "plc",
+}
+
+
+def _canonical_company_name(name: str) -> str:
+    """Normalize punctuation and common legal suffixes for company matching."""
+    normalized = re.sub(r"[^a-z0-9\s]", " ", name.lower())
+    words = [word for word in normalized.split() if word not in _LEGAL_SUFFIXES]
+    return " ".join(words)
+
+
+_COMPANY_CANONICAL_MAP = {
+    _canonical_company_name(name): slug
+    for name, slug in COMPANY_NAME_MAP.items()
+}
+
+
 def normalize_company(company: Optional[str]) -> Optional[str]:
     if not company:
         return None
@@ -82,6 +101,10 @@ def normalize_company(company: Optional[str]) -> Optional[str]:
     lowered = company.lower()
     if lowered in COMPANY_NAME_MAP:
         return COMPANY_NAME_MAP[lowered]
+
+    canonical = _canonical_company_name(company)
+    if canonical in _COMPANY_CANONICAL_MAP:
+        return _COMPANY_CANONICAL_MAP[canonical]
 
     return lowered
 
