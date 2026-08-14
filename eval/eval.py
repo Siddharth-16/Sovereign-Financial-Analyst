@@ -1,640 +1,966 @@
-"""
-Runs the labeled question set in eval/dataset.py end-to-end through the real
-pipeline (app.agent / app.tools) and reports two numbers you can actually
-quote in an interview:
+"""Auditable evaluation harness for Sovereign Financial Analyst.
 
-  1. Retrieval recall@k  -- for each question, does the pipeline's own
-     company/section routing (extract_company / infer_section in agent.py)
-     land on the right (company, section), and does the vector search under
-     that filter come back with at least one chunk tagged with the expected
-     company + section? This exercises the exact routing logic that's
-     currently keyword/regex-based, so it doubles as a routing-accuracy
-     check -- the same brittle logic flagged in the roadmap.
+The benchmark separates four questions that must not be conflated:
 
-  2. Groundedness (faithfulness) -- for each question, does the agent's final
-     synthesized answer only contain claims supported by the context that was
-     actually retrieved for it? Scored with an LLM-as-judge pass using the
-     same local Ollama model the app already uses, so it costs nothing extra
-     to run. This is reference-free: it doesn't require a hand-written gold
-     answer, it just checks the answer against its own retrieved evidence.
+1. Routing / metadata hit: did the application search the expected company and
+   section, and did returned citation metadata match those labels?
+2. Evidence retrieval recall@k: did the exact generation context contain the
+   manually annotated gold evidence spans needed to answer the question?
+3. Groundedness / faithfulness: are the factual claims in the answer supported
+   by the exact context used during that same generation run?
+4. Answer completeness: did the answer contain the manually annotated expected
+   facts, scored deterministically with literal/regex patterns?
 
-Usage (run from the repo root, with your Chroma DB already ingested and
-Ollama running -- same requirements as running the Streamlit app):
+Gold annotations are never invented by this harness. Items without gold evidence
+or expected facts are reported as UNGRADED for those metrics.
 
-    python eval/eval.py                        # full run, both metrics
-    python eval/eval.py --skip-groundedness     # retrieval only, fast
-    python eval/eval.py --category risk_factors # subset by section
-    python eval/eval.py --limit 5               # quick smoke test
-    python eval/eval.py --k 6                   # override retrieval k
-    python eval/eval.py --out eval/report.json  # custom report path
-
-Output: a summary printed to stdout, plus a JSON report (default
-eval/report.json) and a Markdown report (default eval/report.md) with
-per-question detail suitable for pasting into a README or a PR description.
+Examples:
+    python eval/eval.py --mode rule_based
+    python eval/eval.py --mode agentic
+    python eval/eval.py --mode agentic --limit 3
+    python eval/eval.py --mode agentic --runs 3
+    python eval/eval.py --mode agentic --skip-groundedness
+    python eval/eval.py --dataset-module dataset_test --mode agentic
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib
+import inspect
 import json
 import os
-import re
+import statistics
+import subprocess
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+import uuid
+import urllib.error
+import urllib.request
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Iterator, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+EVAL_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(EVAL_DIR))
 
-from app.agent import extract_company, infer_section, ask_agent
-from app.agentic_router import run_agentic_query
-from app.tools import query_financial_reports, normalize_company
-from app.companies import SLUG_TO_DISPLAY, SECTION_DISPLAY_MAP
-
-from dataset import EVAL_QUESTIONS
-
-JUDGE_LLM_PROVIDER = os.getenv("JUDGE_LLM_PROVIDER", "groq" if os.getenv("GROQ_API_KEY") else "ollama")
-JUDGE_OLLAMA_MODEL = os.getenv("JUDGE_OLLAMA_MODEL", "llama3.1")
-JUDGE_GROQ_MODEL = os.getenv("JUDGE_GROQ_MODEL", "llama-3.1-8b-instant")
-
-
-def _build_judge_llm():
-    if JUDGE_LLM_PROVIDER == "groq":
-        from langchain_groq import ChatGroq
-
-        return ChatGroq(model=JUDGE_GROQ_MODEL, temperature=0)
-    from langchain_ollama import ChatOllama
-    from app.config import OLLAMA_BASE_URL
-
-    return ChatOllama(model=JUDGE_OLLAMA_MODEL, base_url=OLLAMA_BASE_URL, temperature=0)
+from metrics import (  # noqa: E402
+    aggregate_results,
+    audit_claim_evidence,
+    call_judge_with_repair,
+    classify_abstention,
+    dataclass_list,
+    detect_abstention,
+    extract_agentic_search_trace,
+    groundedness_from_claims,
+    GroundednessJudgment,
+    metadata_retrieval_hit,
+    score_answer_completeness,
+    score_gold_evidence,
+)
 
 
-judge_llm = _build_judge_llm()  
+JUDGE_SYSTEM_PROMPT = """You are a strict claim-level faithfulness auditor.
 
+You receive QUESTION, CONTEXT, and ANSWER.
 
-# --------------------------------------------------------------------------- data
+Rules:
+- Use ONLY CONTEXT. Do not use outside knowledge.
+- Extract every meaningful factual claim actually made in ANSWER. Split compound
+  statements into atomic claims when they could be supported independently.
+- Ignore headings, source labels/citations, pure formatting, and non-factual
+  conversational language.
+- For each factual claim, set supported=true only if CONTEXT supports it.
+- If supported=true, evidence_quote MUST be a verbatim quote copied from CONTEXT.
+  Keep the quote as short as possible while still supporting the claim.
+- If supported=false, evidence_quote MUST be an empty string.
+- Do not grade completeness. Missing facts are handled by a separate metric.
+- If ANSWER has no meaningful factual claims, return an empty claims list.
 
+Return ONLY valid JSON in exactly this shape:
+{"claims":[{"claim":"...","supported":true,"evidence_quote":"..."}]}
 
-@dataclass
-class QuestionResult:
-    id: str
-    question: str
-    category: str
-    expected_company: str
-    expected_section: str
+The supported field must be a JSON boolean, never a quoted string.
+"""
 
-    routed_company: Optional[str] = None
-    routed_section: Optional[str] = None
-    routing_company_correct: bool = False
-    routing_section_correct: bool = False
-
-    retrieval_hit: bool = False
-    retrieval_citations: list[str] = field(default_factory=list)
-    retrieval_note: str = ""
-
-    groundedness_run: bool = False
-    grounded: Optional[bool] = None
-    unsupported_claims: list[str] = field(default_factory=list)
-    judge_reasoning: str = ""
-    judge_error: Optional[str] = None
-
-    answer: str = ""
-    latency_sec: float = 0.0
-    tool_calls_count: int = 0  # agentic mode only; always 0 for rule_based
-
-
-# --------------------------------------------------------------------- retrieval
-
-
-def evaluate_retrieval(item: dict, k: int) -> QuestionResult:
-    result = QuestionResult(
-        id=item["id"],
-        question=item["question"],
-        category=item["category"],
-        expected_company=item["expected_company"],
-        expected_section=item["expected_section"],
-    )
-
-    # Use the agent's own routing functions -- this is the exact keyword/regex
-    # logic a real user query goes through, not a hand-fed filter.
-    routed_company = extract_company(item["question"])
-    routed_section = infer_section(item["question"])
-
-    result.routed_company = routed_company
-    result.routed_section = routed_section
-    result.routing_company_correct = routed_company == item["expected_company"]
-    result.routing_section_correct = routed_section == item["expected_section"]
-
-    if routed_company is None:
-        result.retrieval_note = "routing failed to identify a company; no retrieval attempted"
-        return result
-
-    filing_result = query_financial_reports(
-        query=item["question"],
-        company=routed_company,
-        fiscal_year=None,
-        section=routed_section,
-        k=k,
-    )
-
-    citations = filing_result.get("citations", [])
-    result.retrieval_citations = citations
-
-    expected_company_display = SLUG_TO_DISPLAY.get(item["expected_company"], item["expected_company"])
-    expected_section_display = SECTION_DISPLAY_MAP.get(item["expected_section"], item["expected_section"])
-
-    hit = any(
-        expected_company_display.lower() in c.lower() and expected_section_display.lower() in c.lower()
-        for c in citations
-    )
-    result.retrieval_hit = hit
-
-    if not citations:
-        result.retrieval_note = "no chunks retrieved under routed filter (possible coverage gap)"
-    elif not hit:
-        result.retrieval_note = "retrieved chunks did not match expected company/section"
-
-    return result
-
-
-# --------------------------------------------------------------------- agentic
-
-
-def evaluate_agentic(item: dict, k: int, run_groundedness: bool) -> QuestionResult:
-    result = QuestionResult(
-        id=item["id"],
-        question=item["question"],
-        category=item["category"],
-        expected_company=item["expected_company"],
-        expected_section=item["expected_section"],
-    )
-
-    start = time.time()
-    try:
-        agentic_result = run_agentic_query(item["question"])
-    except Exception as exc:  
-        result.answer = ""
-        result.judge_error = f"run_agentic_query raised: {exc!r}"
-        result.groundedness_run = run_groundedness
-        result.latency_sec = time.time() - start
-        result.retrieval_note = "agentic call failed; no retrieval attempted"
-        return result
-
-    result.answer = agentic_result["answer"]
-    result.latency_sec = time.time() - start
-    result.tool_calls_count = len(agentic_result["tools_invoked"])
-
-    search_calls = [t for t in agentic_result["tools_invoked"] if t["tool"] == "search_filing"]
-
-    if not search_calls:
-        result.retrieval_note = "agent made no search_filing call; no retrieval attempted"
-        return result
-
-    first_call = search_calls[0]
-    routed_company = normalize_company(first_call["args"].get("company"))
-    routed_section = first_call["args"].get("section")
-
-    result.routed_company = routed_company
-    result.routed_section = routed_section
-    result.routing_company_correct = routed_company == item["expected_company"]
-    result.routing_section_correct = (
-        routed_section == item["expected_section"] if routed_section else False
-    )
-
-    # Pull citations + retrieved text straight from the tool result already
-    # produced during the agent's own run -- no second retrieval call needed.
-    citations: list[str] = []
-    context_parts: list[str] = []
-    for call in search_calls:
-        try:
-            parsed = json.loads(call["result"])
-        except (json.JSONDecodeError, TypeError):
-            continue
-        citations.extend(parsed.get("citations", []))
-        content = parsed.get("content", "")
-        if content:
-            context_parts.append(content)
-
-    result.retrieval_citations = citations
-
-    expected_company_display = SLUG_TO_DISPLAY.get(item["expected_company"], item["expected_company"])
-    expected_section_display = SECTION_DISPLAY_MAP.get(item["expected_section"], item["expected_section"])
-
-    hit = any(
-        expected_company_display.lower() in c.lower() and expected_section_display.lower() in c.lower()
-        for c in citations
-    )
-    result.retrieval_hit = hit
-
-    if not citations:
-        result.retrieval_note = "no citations returned by the agent's tool call(s)"
-    elif not hit:
-        result.retrieval_note = "retrieved chunks did not match expected company/section"
-
-    if run_groundedness:
-        context = "\n\n".join(context_parts)
-        try:
-            verdict = judge_groundedness(item["question"], context, result.answer)
-        except Exception as exc:  
-            result.groundedness_run = True
-            result.judge_error = f"judge call raised: {exc!r}"
-            return result
-
-        result.groundedness_run = True
-        result.grounded = verdict["grounded"]
-        result.unsupported_claims = verdict["unsupported_claims"]
-        result.judge_reasoning = verdict["reasoning"]
-        result.judge_error = verdict["error"]
-
-    return result
-
-
-# ------------------------------------------------------------------- groundedness
-
-JUDGE_SYSTEM_PROMPT = """You are a strict fact-checking auditor for a financial research assistant.
-
-You will be given:
-- QUESTION: what the user asked
-- CONTEXT: the retrieved 10-K excerpt(s) the assistant was allowed to use
-- ANSWER: the assistant's final answer
-
-Your ONLY job: determine whether every factual claim actually stated in ANSWER is supported by CONTEXT.
-"Supported" means the claim, or something that reasonably implies it, appears in CONTEXT.
-Do not use outside knowledge about the real company -- judge only against CONTEXT.
-
-IMPORTANT -- faithfulness vs. completeness, do not conflate them:
-- You are grading FAITHFULNESS ONLY: does ANSWER ever state something CONTEXT does not support?
-- You are NOT grading completeness. If CONTEXT contains additional facts (e.g. a 4th business
-  segment, an extra risk factor) that ANSWER simply does not mention, that is NOT a violation.
-  An answer that omits available context but states nothing false is still grounded=true.
-- Only set grounded=false if ANSWER contains a specific claim, figure, or detail that CONTEXT
-  does not support -- never for something ANSWER left out.
-- "unsupported_claims" must only list claims that ANSWER actually made and CONTEXT contradicts
-  or is silent on -- never list something that ANSWER did not say.
-
-If CONTEXT says the data is unavailable/not indexed, and ANSWER honestly says the same, that counts as grounded.
-
-Respond with ONLY a JSON object, no markdown fences, no commentary, in exactly this shape:
-{"grounded": true or false, "unsupported_claims": ["short phrase", ...], "reasoning": "one sentence"}
+JUDGE_REPAIR_PROMPT = """You repair JSON produced by a claim-level evaluator.
+Return ONLY JSON matching this exact schema:
+{"claims":[{"claim":"string","supported":true,"evidence_quote":"string"}]}
+The supported field must be a JSON boolean. Do not add or remove substantive
+claims or change verdict meaning; repair only syntax, missing required fields,
+or invalid JSON types when the intended value is unambiguous.
 """
 
 
-def judge_groundedness(question: str, context: str, answer: str) -> dict:
-    user_prompt = f"""QUESTION:
-{question}
+# ---------------------------------------------------------------------------
+# Loading and reproducibility metadata
+# ---------------------------------------------------------------------------
 
-CONTEXT:
-{context if context else "(no context was retrieved)"}
 
-ANSWER:
-{answer}
+def _load_dataset(module_name: str) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    module = importlib.import_module(module_name)
+    questions = list(getattr(module, "EVAL_QUESTIONS"))
+    metadata = {
+        "dataset_name": getattr(module, "DATASET_NAME", module_name),
+        "dataset_version": getattr(module, "DATASET_VERSION", "unversioned"),
+        "dataset_split": getattr(module, "DATASET_SPLIT", "dev"),
+    }
+    return questions, metadata
 
-Return the JSON verdict now.
-"""
-    response = judge_llm.invoke(
-        [
-            {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+
+def _load_app_components() -> dict[str, Any]:
+    import app.agent as agent_module
+    import app.agentic_router as agentic_module
+    import app.config as app_config
+    from app.companies import SECTION_DISPLAY_MAP, SLUG_TO_DISPLAY
+    from app.tools import normalize_company, normalize_section, query_financial_reports
+
+    production_k = inspect.signature(query_financial_reports).parameters["k"].default
+    generation_model = (
+        app_config.GROQ_MODEL if app_config.LLM_PROVIDER == "groq" else app_config.OLLAMA_MODEL
     )
-    raw = response.content if hasattr(response, "content") else str(response)
-    cleaned = re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
-
-    try:
-        parsed = json.loads(cleaned)
-        grounded = bool(parsed.get("grounded"))
-        unsupported_claims = list(parsed.get("unsupported_claims", []))
-        if grounded and unsupported_claims:
-            # Self-contradictory verdict: the judge listed a real unsupported
-            # claim but still marked the answer grounded. Treat as ungrounded
-            # rather than silently trusting the boolean -- this exact failure
-            # mode is what inflated a prior report to a false 1.0 score.
-            grounded = False
-        return {
-            "grounded": grounded,
-            "unsupported_claims": unsupported_claims,
-            "reasoning": str(parsed.get("reasoning", "")),
-            "error": None,
-        }
-    except (json.JSONDecodeError, TypeError, ValueError):
-        return {
-            "grounded": None,
-            "unsupported_claims": [],
-            "reasoning": "",
-            "error": f"judge returned non-JSON output: {raw[:200]!r}",
-        }
-
-
-def evaluate_groundedness(item: dict, result: QuestionResult) -> None:
-    start = time.time()
-    try:
-        answer, _ = ask_agent(item["question"])
-    except Exception as exc:  
-        result.answer = ""
-        result.judge_error = f"ask_agent raised: {exc!r}"
-        result.groundedness_run = True
-        result.latency_sec = time.time() - start
-        return
-
-    result.answer = answer
-    result.latency_sec = time.time() - start
-
-    routed_company = result.routed_company
-    routed_section = result.routed_section
-    context = ""
-    if routed_company:
-        try:
-            filing_result = query_financial_reports(
-                query=item["question"],
-                company=routed_company,
-                fiscal_year=None,
-                section=routed_section,
-            )
-            context = filing_result.get("content", "") or ""
-        except Exception as exc:  
-            result.groundedness_run = True
-            result.judge_error = f"context retrieval for judge raised: {exc!r}"
-            return
-
-    try:
-        verdict = judge_groundedness(item["question"], context, answer)
-    except Exception as exc:  
-        result.groundedness_run = True
-        result.judge_error = f"judge call raised: {exc!r}"
-        return
-
-    result.groundedness_run = True
-    result.grounded = verdict["grounded"]
-    result.unsupported_claims = verdict["unsupported_claims"]
-    result.judge_reasoning = verdict["reasoning"]
-    result.judge_error = verdict["error"]
-
-
-# --------------------------------------------------------------------- reporting
-
-
-def summarize(results: list[QuestionResult]) -> dict:
-    total = len(results)
-    routed = [r for r in results if r.routed_company is not None]
-
-    retrieval_hits = sum(1 for r in results if r.retrieval_hit)
-    company_correct = sum(1 for r in results if r.routing_company_correct)
-    section_correct = sum(1 for r in results if r.routing_section_correct)
-
-    graded = [r for r in results if r.groundedness_run and r.grounded is not None]
-    grounded_count = sum(1 for r in graded if r.grounded)
-    judge_errors = sum(1 for r in results if r.judge_error)
-
-    total_tool_calls = sum(r.tool_calls_count for r in results)
-    zero_tool_call_questions = sum(1 for r in results if r.tool_calls_count == 0)
-
-    by_category: dict[str, dict] = {}
-    for r in results:
-        cat = by_category.setdefault(
-            r.category, {"total": 0, "retrieval_hits": 0, "grounded": 0, "graded": 0}
-        )
-        cat["total"] += 1
-        if r.retrieval_hit:
-            cat["retrieval_hits"] += 1
-        if r.groundedness_run and r.grounded is not None:
-            cat["graded"] += 1
-            if r.grounded:
-                cat["grounded"] += 1
-
     return {
-        "total_questions": total,
-        "routing_company_accuracy": round(company_correct / total, 3) if total else 0.0,
-        "routing_section_accuracy": round(section_correct / total, 3) if total else 0.0,
-        "retrieval_recall_at_k": round(retrieval_hits / total, 3) if total else 0.0,
-        "retrieval_hits": retrieval_hits,
-        "retrieval_misses": total - retrieval_hits,
-        "unrouted_questions": total - len(routed),
-        "groundedness_graded": len(graded),
-        "groundedness_score": round(grounded_count / len(graded), 3) if graded else None,
-        "judge_errors": judge_errors,
-        "avg_tool_calls_per_question": round(total_tool_calls / total, 3) if total else 0.0,
-        "questions_with_zero_tool_calls": zero_tool_call_questions,
-        "by_category": {
-            cat: {
-                "total": v["total"],
-                "retrieval_recall_at_k": round(v["retrieval_hits"] / v["total"], 3) if v["total"] else 0.0,
-                "groundedness_score": round(v["grounded"] / v["graded"], 3) if v["graded"] else None,
-            }
-            for cat, v in by_category.items()
-        },
+        "agent_module": agent_module,
+        "agentic_module": agentic_module,
+        "app_config": app_config,
+        "SLUG_TO_DISPLAY": SLUG_TO_DISPLAY,
+        "SECTION_DISPLAY_MAP": SECTION_DISPLAY_MAP,
+        "normalize_company": normalize_company,
+        "normalize_section": normalize_section,
+        "production_k": production_k,
+        "generation_provider": app_config.LLM_PROVIDER,
+        "generation_model": generation_model,
+        "embedding_model": app_config.EMBED_MODEL,
     }
 
 
-def write_markdown_report(path: Path, summary: dict, results: list[QuestionResult]) -> None:
-    lines = []
-    lines.append("# Sovereign Financial Analyst -- Phase 1 Eval Report\n")
-    lines.append(f"Questions evaluated: **{summary['total_questions']}**\n")
-    lines.append("## Headline numbers\n")
-    lines.append(f"- **Retrieval recall@k:** {summary['retrieval_recall_at_k'] * 100:.1f}% "
-                 f"({summary['retrieval_hits']}/{summary['total_questions']})")
-    lines.append(f"- **Company routing accuracy:** {summary['routing_company_accuracy'] * 100:.1f}%")
-    lines.append(f"- **Section routing accuracy:** {summary['routing_section_accuracy'] * 100:.1f}%")
-    if summary["groundedness_score"] is not None:
-        lines.append(f"- **Groundedness (faithfulness):** {summary['groundedness_score'] * 100:.1f}% "
-                     f"of graded answers ({summary['groundedness_graded']} graded)")
-    else:
-        lines.append("- **Groundedness:** not run (use without `--skip-groundedness`)")
-    if summary["judge_errors"]:
-        lines.append(f"- Judge parse errors: {summary['judge_errors']} (see JSON report for detail)")
-    lines.append("")
+def _git_metadata() -> dict[str, Any]:
+    def run(*args: str) -> str | None:
+        try:
+            completed = subprocess.run(
+                ["git", "-C", str(REPO_ROOT), *args],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            return completed.stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            return None
 
-    lines.append("## By section\n")
-    lines.append("| Section | N | Retrieval recall@k | Groundedness |")
-    lines.append("|---|---|---|---|")
-    for cat, v in summary["by_category"].items():
-        g = f"{v['groundedness_score'] * 100:.1f}%" if v["groundedness_score"] is not None else "n/a"
-        lines.append(f"| {cat} | {v['total']} | {v['retrieval_recall_at_k'] * 100:.1f}% | {g} |")
-    lines.append("")
-
-    lines.append("## Misses\n")
-    misses = [r for r in results if not r.retrieval_hit or r.grounded is False]
-    if not misses:
-        lines.append("None. ")
-    for r in misses:
-        lines.append(f"- **{r.id}** ({r.category}): \"{r.question}\"")
-        if not r.retrieval_hit:
-            lines.append(f"  - retrieval miss: routed to (company={r.routed_company}, section={r.routed_section}), "
-                         f"expected (company={r.expected_company}, section={r.expected_section}). {r.retrieval_note}")
-        if r.grounded is False:
-            claims = "; ".join(r.unsupported_claims) if r.unsupported_claims else "(unspecified)"
-            lines.append(f"  - groundedness fail: {r.judge_reasoning or ''} unsupported claims: {claims}")
-    lines.append("")
-
-    path.write_text("\n".join(lines), encoding="utf-8")
+    sha = run("rev-parse", "HEAD") or os.getenv("GIT_COMMIT_SHA")
+    status = run("status", "--porcelain")
+    return {
+        "git_commit_sha": sha,
+        "working_tree_dirty": bool(status) if status is not None else None,
+    }
 
 
-def print_comparison(summary_rb: dict, summary_ag: dict) -> None:
-    print("\n" + "=" * 72)
-    print("RULE_BASED vs AGENTIC")
-    print("=" * 72)
-    rows = [
-        ("Retrieval recall@k", summary_rb["retrieval_recall_at_k"], summary_ag["retrieval_recall_at_k"]),
-        ("Company routing accuracy", summary_rb["routing_company_accuracy"], summary_ag["routing_company_accuracy"]),
-        ("Groundedness", summary_rb["groundedness_score"], summary_ag["groundedness_score"]),
-    ]
-    for label, rb, ag in rows:
-        rb_s = f"{rb * 100:.1f}%" if rb is not None else "n/a"
-        ag_s = f"{ag * 100:.1f}%" if ag is not None else "n/a"
-        print(f"{label:<28} rule_based: {rb_s:<8} agentic: {ag_s}")
-    print(f"{'Avg tool calls/question':<28} rule_based: n/a       agentic: {summary_ag['avg_tool_calls_per_question']}")
-    print("=" * 72)
+def _judge_metadata(app: dict[str, Any]) -> dict[str, str]:
+    """Resolve the judge provider without overriding the app's provider choice.
 
-
-def write_comparison_report(path: Path, summary_rb: dict, summary_ag: dict) -> None:
-    lines = ["# Sovereign Financial Analyst -- rule_based vs agentic\n"]
-    lines.append("| Metric | rule_based | agentic |")
-    lines.append("|---|---|---|")
-
-    def fmt(v: Optional[float]) -> str:
-        return f"{v * 100:.1f}%" if v is not None else "n/a"
-
-    lines.append(f"| Retrieval recall@k | {fmt(summary_rb['retrieval_recall_at_k'])} | {fmt(summary_ag['retrieval_recall_at_k'])} |")
-    lines.append(f"| Company routing accuracy | {fmt(summary_rb['routing_company_accuracy'])} | {fmt(summary_ag['routing_company_accuracy'])} |")
-    lines.append(f"| Section routing accuracy | {fmt(summary_rb['routing_section_accuracy'])} | {fmt(summary_ag['routing_section_accuracy'])} |")
-    lines.append(f"| Groundedness | {fmt(summary_rb['groundedness_score'])} | {fmt(summary_ag['groundedness_score'])} |")
-    lines.append(f"| Avg tool calls / question | n/a | {summary_ag['avg_tool_calls_per_question']} |")
-    lines.append(f"| Questions with zero tool calls | n/a | {summary_ag['questions_with_zero_tool_calls']} |")
-    lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
-
-
-# -------------------------------------------------------------------------- main
-
-
-def run_eval(questions: list[dict], mode: str, args: argparse.Namespace, out_path: Path, md_path: Path) -> dict:
-    """Runs one full pass (either mode) over `questions`, checkpointing and
-    reporting to the given paths. Returns the summary dict."""
-    label = "Phase 1 eval" if mode == "rule_based" else "Phase 2 agentic eval"
-    print(f"\nRunning {label} ({mode}) on {len(questions)} question(s)"
-          f"{' (retrieval only)' if args.skip_groundedness else ''} ...\n")
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    results: list[QuestionResult] = []
-    for i, item in enumerate(questions, start=1):
-        print(f"[{i}/{len(questions)}] {item['id']}: {item['question']}")
-
-        if mode == "rule_based":
-            result = evaluate_retrieval(item, k=args.k)
-            status = "HIT " if result.retrieval_hit else "MISS"
-            print(f"    routing -> company={result.routed_company} section={result.routed_section} "
-                  f"| retrieval {status}")
-            if not args.skip_groundedness:
-                evaluate_groundedness(item, result)
-                if result.grounded is not None:
-                    print(f"    groundedness -> {'GROUNDED' if result.grounded else 'NOT GROUNDED'}")
-                elif result.judge_error:
-                    print(f"    groundedness -> judge error: {result.judge_error}")
-        else:  # agentic
-            result = evaluate_agentic(item, k=args.k, run_groundedness=not args.skip_groundedness)
-            status = "HIT " if result.retrieval_hit else "MISS"
-            print(f"    agent routed -> company={result.routed_company} section={result.routed_section} "
-                  f"| tool_calls={result.tool_calls_count} | retrieval {status}")
-            if result.grounded is not None:
-                print(f"    groundedness -> {'GROUNDED' if result.grounded else 'NOT GROUNDED'}")
-            elif result.judge_error:
-                print(f"    groundedness -> judge error: {result.judge_error}")
-
-        results.append(result)
-
-        # Checkpoint after every question -- if Ollama/the process hard-crashes
-        # partway through (e.g. a Metal OOM), you still have every result up
-        # to that point on disk instead of losing the whole run.
-        partial_summary = summarize(results)
-        out_path.write_text(
-            json.dumps({"mode": mode, "summary": partial_summary, "results": [asdict(r) for r in results],
-                        "status": "in_progress" if i < len(questions) else "complete"}, indent=2),
-            encoding="utf-8",
+    JUDGE_LLM_PROVIDER is an optional explicit override. If it is unset, the
+    evaluator uses the same LLM_PROVIDER/model configured for the application.
+    Merely having a GROQ_API_KEY must never switch the judge to Groq.
+    """
+    app_config = app["app_config"]
+    provider = os.getenv("JUDGE_LLM_PROVIDER", app_config.LLM_PROVIDER).strip().lower()
+    if provider not in {"groq", "ollama"}:
+        raise ValueError(
+            f"Unknown JUDGE_LLM_PROVIDER={provider!r}. Expected 'groq' or 'ollama'."
         )
 
-        if args.sleep and i < len(questions):
-            time.sleep(args.sleep)
+    if provider == "groq":
+        model = os.getenv("JUDGE_GROQ_MODEL", app_config.GROQ_MODEL)
+    else:
+        model = os.getenv("JUDGE_OLLAMA_MODEL", app_config.OLLAMA_MODEL)
+    return {
+        "judge_provider": provider,
+        "judge_model": model,
+        "judge_output_mode": "ollama_json_schema" if provider == "ollama" else "prompt_json",
+    }
 
-    summary = summarize(results)
 
+class _JudgeClient:
+    """Eval-only judge client.
+
+    Ollama uses its native JSON-schema `format` capability so malformed JSON is
+    constrained at generation time. Groq keeps the existing LangChain path.
+    """
+
+    def __init__(self, app: dict[str, Any]):
+        meta = _judge_metadata(app)
+        self.provider = meta["judge_provider"]
+        self.model = meta["judge_model"]
+        self.base_url = app["app_config"].OLLAMA_BASE_URL.rstrip("/")
+        self.timeout_sec = float(os.getenv("JUDGE_TIMEOUT_SECONDS", "180"))
+        self.llm = None
+
+        if self.provider == "groq":
+            from langchain_groq import ChatGroq
+            self.llm = ChatGroq(model=self.model, temperature=0)
+
+    def invoke_text(self, messages: list[dict[str, str]]) -> str:
+        if self.provider == "ollama":
+            return self._invoke_ollama_structured(messages)
+
+        response = self.llm.invoke(messages)
+        content = response.content if hasattr(response, "content") else response
+        if isinstance(content, str):
+            return content
+        return json.dumps(content, ensure_ascii=False)
+
+    def _invoke_ollama_structured(self, messages: list[dict[str, str]]) -> str:
+        # Ollama accepts a JSON schema in `format`; using the exact Pydantic
+        # schema prevents the common truncated/fenced/malformed JSON failures
+        # seen when a small local model is only prompted to "return JSON".
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "format": GroundednessJudgment.model_json_schema(),
+            "options": {
+                "temperature": 0,
+                "num_predict": int(os.getenv("JUDGE_NUM_PREDICT", "4096")),
+            },
+        }
+        request = urllib.request.Request(
+            f"{self.base_url}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_sec) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Ollama judge HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Ollama judge unavailable: {exc.reason}") from exc
+
+        content = body.get("message", {}).get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError(f"Ollama judge returned no message content: {body!r}")
+        return content
+
+
+def _build_judge_llm(app: dict[str, Any]) -> _JudgeClient:
+    return _JudgeClient(app)
+
+
+def _invoke_judge_text(judge: Any, messages: list[dict[str, str]]) -> str:
+    """Invoke either the eval JudgeClient or a LangChain-like test/fallback model."""
+    if hasattr(judge, "invoke_text"):
+        return judge.invoke_text(messages)
+    response = judge.invoke(messages)
+    content = response.content if hasattr(response, "content") else response
+    if isinstance(content, str):
+        return content
+    return json.dumps(content, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Exact generation-context capture
+# ---------------------------------------------------------------------------
+
+
+@contextmanager
+def capture_rule_based_retrieval(agent_module: Any) -> Iterator[list[dict[str, Any]]]:
+    """Evaluation-only instrumentation around the exact retrieval call.
+
+    app.agent imports query_financial_reports into its module namespace. Replacing
+    only that reference for the duration of one ask_agent call lets the harness
+    capture the exact returned content without a second retrieval and without any
+    production-code change or behavior change.
+    """
+
+    original = agent_module.query_financial_reports
+    signature = inspect.signature(original)
+    trace: list[dict[str, Any]] = []
+
+    def wrapped(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        bound = signature.bind_partial(*args, **kwargs)
+        bound.apply_defaults()
+        call_args = dict(bound.arguments)
+        started = time.perf_counter()
+        try:
+            result = original(*args, **kwargs)
+        except Exception as exc:
+            trace.append(
+                {
+                    "args": call_args,
+                    "error": repr(exc),
+                    "latency_sec": time.perf_counter() - started,
+                }
+            )
+            raise
+        trace.append(
+            {
+                "args": call_args,
+                "result": result,
+                "latency_sec": time.perf_counter() - started,
+            }
+        )
+        return result
+
+    agent_module.query_financial_reports = wrapped
+    try:
+        yield trace
+    finally:
+        agent_module.query_financial_reports = original
+
+
+def _extract_rule_based_trace(trace: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    contexts: list[str] = []
+    citations: list[str] = []
+    errors = 0
+    for call in trace:
+        if call.get("error"):
+            errors += 1
+        result = call.get("result")
+        if not isinstance(result, dict):
+            continue
+        content = result.get("content")
+        if isinstance(content, str) and content:
+            contexts.append(content)
+        result_citations = result.get("citations", [])
+        if isinstance(result_citations, list):
+            citations.extend(str(c) for c in result_citations)
+    return {
+        "context": "\n\n".join(contexts),
+        "citations": citations,
+        "retrieval_calls": list(trace),
+        "retrieval_call_count": len(trace),
+        "tool_errors": errors,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Scoring helpers
+# ---------------------------------------------------------------------------
+
+
+def _routing_from_calls(
+    calls: Sequence[dict[str, Any]],
+    expected_company: str,
+    expected_section: str,
+    app: dict[str, Any],
+    *,
+    agentic: bool,
+) -> tuple[list[dict[str, Any]], bool, bool]:
+    routes: list[dict[str, Any]] = []
+    for call in calls:
+        args = call.get("args", {}) if agentic else call.get("args", {})
+        company = app["normalize_company"](args.get("company"))
+        section = app["normalize_section"](args.get("section"))
+        routes.append(
+            {
+                "raw_company": args.get("company"),
+                "company": company,
+                "raw_section": args.get("section"),
+                "section": section,
+                "fiscal_year": args.get("fiscal_year"),
+                "query": args.get("question") if agentic else args.get("query"),
+            }
+        )
+
+    if not routes:
+        return routes, False, False
+
+    company_correct = all(route["company"] == expected_company for route in routes)
+    section_correct = all(route["section"] == expected_section for route in routes)
+    return routes, company_correct, section_correct
+
+
+def _effective_answerable(item: dict[str, Any]) -> bool | None:
+    if "answerable" in item:
+        value = item["answerable"]
+        return value if isinstance(value, bool) else None
+    if item.get("gold_evidence"):
+        return True
+    return None
+
+
+def _score_groundedness(
+    question: str,
+    context: str,
+    answer: str,
+    judge_llm: Any,
+) -> dict[str, Any]:
+    user_prompt = f"""QUESTION:\n{question}\n\nCONTEXT:\n{context or '(no context)'}\n\nANSWER:\n{answer}\n"""
+    messages = [
+        {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    started = time.perf_counter()
+    try:
+        judgment, error, attempts, raw_outputs = call_judge_with_repair(
+            lambda msgs: _invoke_judge_text(judge_llm, msgs),
+            messages,
+            repair_system_prompt=JUDGE_REPAIR_PROMPT,
+        )
+    except Exception as exc:
+        return {
+            "groundedness_status": "JUDGE_ERROR",
+            "judge_error": f"judge invocation failed: {exc!r}",
+            "judge_attempts": 0,
+            "judge_raw_outputs": [],
+            "judge_latency_sec": time.perf_counter() - started,
+            "claims": [],
+            "supported_claims": 0,
+            "total_claims": 0,
+            "claim_groundedness": None,
+            "answer_grounded": None,
+            "unsupported_claims": [],
+        }
+
+    latency = time.perf_counter() - started
+    if judgment is None:
+        return {
+            "groundedness_status": "JUDGE_ERROR",
+            "judge_error": error,
+            "judge_attempts": attempts,
+            "judge_raw_outputs": raw_outputs,
+            "judge_latency_sec": latency,
+            "claims": [],
+            "supported_claims": 0,
+            "total_claims": 0,
+            "claim_groundedness": None,
+            "answer_grounded": None,
+            "unsupported_claims": [],
+        }
+
+    audited = audit_claim_evidence(judgment, context)
+    score = groundedness_from_claims(audited)
+    return {
+        "groundedness_status": score["status"],
+        "judge_error": None,
+        "judge_attempts": attempts,
+        "judge_raw_outputs": raw_outputs,
+        "judge_latency_sec": latency,
+        "claims": dataclass_list(audited),
+        "supported_claims": score["supported_claims"],
+        "total_claims": score["total_claims"],
+        "claim_groundedness": score["claim_groundedness"],
+        "answer_grounded": score["answer_grounded"],
+        "unsupported_claims": score["unsupported_claims"],
+    }
+
+
+def _empty_groundedness(status: str) -> dict[str, Any]:
+    return {
+        "groundedness_status": status,
+        "judge_error": None,
+        "judge_attempts": 0,
+        "judge_raw_outputs": [],
+        "judge_latency_sec": None,
+        "claims": [],
+        "supported_claims": 0,
+        "total_claims": 0,
+        "claim_groundedness": None,
+        "answer_grounded": None,
+        "unsupported_claims": [],
+    }
+
+
+# ---------------------------------------------------------------------------
+# One question / one run
+# ---------------------------------------------------------------------------
+
+
+def evaluate_question(
+    item: dict[str, Any],
+    mode: str,
+    app: dict[str, Any],
+    judge_llm: Any | None,
+    groundedness_enabled: bool,
+) -> dict[str, Any]:
+    started = time.perf_counter()
+    answer = ""
+    context = ""
+    citations: list[str] = []
+    actual_routing: list[dict[str, Any]] = []
+    retrieval_call_count = 0
+    search_call_count = 0
+    total_tool_calls = 0
+    tool_errors = 0
+    application_error: str | None = None
+    tool_calls: list[dict[str, Any]] = []
+
+    try:
+        if mode == "agentic":
+            agentic_result = app["agentic_module"].run_agentic_query(item["question"])
+            answer = str(agentic_result.get("answer", ""))
+            tool_calls = list(agentic_result.get("tools_invoked", []))
+            trace = extract_agentic_search_trace(tool_calls)
+            context = trace["context"]
+            citations = trace["citations"]
+            search_call_count = trace["search_call_count"]
+            total_tool_calls = trace["total_tool_calls"]
+            tool_errors = trace["tool_errors"]
+            actual_routing, company_correct, section_correct = _routing_from_calls(
+                trace["search_calls"],
+                item["expected_company"],
+                item["expected_section"],
+                app,
+                agentic=True,
+            )
+        else:
+            with capture_rule_based_retrieval(app["agent_module"]) as raw_trace:
+                answer, _active_company = app["agent_module"].ask_agent(item["question"])
+            trace = _extract_rule_based_trace(raw_trace)
+            context = trace["context"]
+            citations = trace["citations"]
+            retrieval_call_count = trace["retrieval_call_count"]
+            tool_errors = trace["tool_errors"]
+            actual_routing, company_correct, section_correct = _routing_from_calls(
+                raw_trace,
+                item["expected_company"],
+                item["expected_section"],
+                app,
+                agentic=False,
+            )
+    except Exception as exc:
+        company_correct = False
+        section_correct = False
+        application_error = repr(exc)
+
+    application_latency = time.perf_counter() - started
+
+    expected_company_display = app["SLUG_TO_DISPLAY"].get(
+        item["expected_company"], item["expected_company"]
+    )
+    expected_section_display = app["SECTION_DISPLAY_MAP"].get(
+        item["expected_section"], item["expected_section"]
+    )
+    metadata_hit = metadata_retrieval_hit(
+        citations,
+        expected_company_display,
+        expected_section_display,
+    )
+
+    evidence_score = score_gold_evidence(item.get("gold_evidence"), context)
+    completeness = score_answer_completeness(item.get("expected_facts"), answer)
+    abstained, abstention_phrase = detect_abstention(answer)
+    answerable = _effective_answerable(item)
+    abstention_correctness = classify_abstention(abstained, answerable)
+
+    if groundedness_enabled and judge_llm is not None and not application_error:
+        groundedness = _score_groundedness(item["question"], context, answer, judge_llm)
+    elif groundedness_enabled and application_error:
+        groundedness = _empty_groundedness("SKIPPED")
+    else:
+        groundedness = _empty_groundedness("SKIPPED")
+
+    result = {
+        "id": item["id"],
+        "question": item["question"],
+        "category": item.get("category"),
+        "expected_company": item["expected_company"],
+        "expected_section": item["expected_section"],
+        "actual_routing": actual_routing,
+        "routing_company_correct": company_correct,
+        "routing_section_correct": section_correct,
+        "retrieved_citations": citations,
+        "metadata_retrieval_hit": metadata_hit,
+        "gold_evidence": item.get("gold_evidence", []),
+        "evidence_status": evidence_score.status,
+        "evidence_found": evidence_score.found,
+        "evidence_total": evidence_score.total,
+        "evidence_retrieval_recall_at_k": evidence_score.recall,
+        "evidence_question_success": evidence_score.question_success,
+        "retrieved_gold_evidence_match": evidence_score.matches,
+        "generation_context": context,
+        "answer": answer,
+        "expected_facts": item.get("expected_facts", []),
+        "completeness_status": completeness.status,
+        "facts_found": completeness.found,
+        "facts_total": completeness.total,
+        "answer_fact_completeness": completeness.recall,
+        "completeness_result": completeness.matches,
+        "answerable": answerable,
+        "abstained": abstained,
+        "abstention_phrase": abstention_phrase,
+        "abstention_correctness": abstention_correctness,
+        "tool_calls": tool_calls,
+        "search_call_count": search_call_count,
+        "retrieval_call_count": retrieval_call_count,
+        "total_tool_calls": total_tool_calls,
+        "tool_errors": tool_errors,
+        "is_filing_question": item.get("is_filing_question", True),
+        "application_latency_sec": application_latency,
+        "application_error": application_error,
+        "groundedness_requested": groundedness_enabled,
+        **groundedness,
+    }
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+
+
+def _fmt_pct(value: float | None) -> str:
+    return "UNGRADED" if value is None else f"{value * 100:.1f}%"
+
+
+def _fmt_sec(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.2f}s"
+
+
+def print_question_result(result: dict[str, Any]) -> None:
+    evidence = (
+        "UNGRADED"
+        if result["evidence_total"] == 0
+        else f"{result['evidence_found']}/{result['evidence_total']} "
+        f"({_fmt_pct(result['evidence_retrieval_recall_at_k'])})"
+    )
+    status = result["groundedness_status"]
+    if status == "GRADED":
+        grounded = (
+            f"{result['supported_claims']}/{result['total_claims']} "
+            f"({_fmt_pct(result['claim_groundedness'])})"
+        )
+    elif status == "NO_FACTUAL_CLAIMS":
+        grounded = "NO_FACTUAL_CLAIMS"
+    elif status == "JUDGE_ERROR":
+        grounded = "JUDGE_ERROR"
+    else:
+        grounded = "SKIPPED"
+
+    completeness = (
+        "UNGRADED"
+        if result["facts_total"] == 0
+        else f"{result['facts_found']}/{result['facts_total']} "
+        f"({_fmt_pct(result['answer_fact_completeness'])})"
+    )
+    print(
+        f"[{result['id']}] metadata_hit={result['metadata_retrieval_hit']} "
+        f"evidence={evidence} groundedness={grounded} completeness={completeness} "
+        f"latency={result['application_latency_sec']:.2f}s"
+    )
+    if result.get("application_error"):
+        print(f"  application_error={result['application_error']}")
+    if result.get("judge_error"):
+        print(f"  judge_error={result['judge_error']}")
+
+
+def print_summary(summary: dict[str, Any], mode: str) -> None:
     print("\n" + "=" * 72)
     print(f"SUMMARY ({mode})")
     print("=" * 72)
-    print(f"Retrieval recall@k:        {summary['retrieval_recall_at_k'] * 100:.1f}% "
-          f"({summary['retrieval_hits']}/{summary['total_questions']})")
-    print(f"Company routing accuracy:  {summary['routing_company_accuracy'] * 100:.1f}%")
-    print(f"Section routing accuracy:  {summary['routing_section_accuracy'] * 100:.1f}%")
-    if summary["groundedness_score"] is not None:
-        print(f"Groundedness score:        {summary['groundedness_score'] * 100:.1f}% "
-              f"({summary['groundedness_graded']} graded, {summary['judge_errors']} judge errors)")
-    else:
-        print("Groundedness score:        not run")
+    print(f"Questions:                    {summary['questions']}")
+    print(f"Company routing accuracy:     {_fmt_pct(summary['company_routing_accuracy'])}")
+    print(f"Section routing accuracy:     {_fmt_pct(summary['section_routing_accuracy'])}")
+    print("")
+    print(f"Metadata retrieval hit:       {_fmt_pct(summary['metadata_retrieval_hit_rate'])}")
+    print(
+        f"Evidence retrieval recall@k:  {_fmt_pct(summary['evidence_retrieval_recall_at_k'])} "
+        f"({summary['evidence_items_found']}/{summary['evidence_items_total']} gold evidence items)"
+    )
+    print(
+        f"Evidence question success:    {_fmt_pct(summary['evidence_question_success_rate'])} "
+        f"({summary['evidence_questions_graded']} graded questions)"
+    )
+    print("")
+    print(
+        f"Answer groundedness:          {_fmt_pct(summary['answer_groundedness'])} "
+        f"({summary['answers_grounded']}/{summary['answers_groundedness_graded']} graded answers)"
+    )
+    print(
+        f"Claim groundedness:           {_fmt_pct(summary['claim_groundedness_micro'])} "
+        f"({summary['supported_claims']}/{summary['total_factual_claims']} factual claims)"
+    )
+    print(
+        f"Answer fact completeness:     {_fmt_pct(summary['answer_fact_completeness'])} "
+        f"({summary['expected_facts_found']}/{summary['expected_facts_total']} expected facts)"
+    )
+    print("")
+    print(f"Abstentions:                  {summary['abstentions']}")
+    print(f"Correct abstentions:          {summary['correct_abstentions']}")
+    print(f"Incorrect abstentions:        {summary['incorrect_abstentions']}")
+    print(f"Questions groundedness graded:{summary['judge_graded']}")
+    print(f"Questions ungraded:           {summary['judge_ungraded']}")
+    print(f"Judge errors:                 {summary['judge_errors']}")
+    print(f"Judge error rate:             {_fmt_pct(summary['judge_error_rate'])}")
+    print(f"Judge coverage:               {_fmt_pct(summary['judge_coverage'])}")
     if mode == "agentic":
-        print(f"Avg tool calls/question:   {summary['avg_tool_calls_per_question']}")
+        avg_search = summary["avg_search_calls_per_question"]
+        avg_search_text = "n/a" if avg_search is None else f"{avg_search:.2f}"
+        print("")
+        print(f"Avg search calls/question:    {avg_search_text}")
+        print(f"Total tool calls:             {summary['total_tool_calls']}")
+        print(f"Zero-tool-call questions:     {summary['zero_tool_call_questions']}")
+        print(f"Tool errors:                  {summary['tool_errors']}")
+        print(
+            f"Filing questions using search:{_fmt_pct(summary['filing_questions_search_filing_rate'])}"
+        )
+    print("")
+    print(f"Application latency mean:     {_fmt_sec(summary['application_latency_mean_sec'])}")
+    print(f"Application latency median:   {_fmt_sec(summary['application_latency_median_sec'])}")
+    print(f"Application latency p95:      {_fmt_sec(summary['application_latency_p95_sec'])}")
+    print(f"Judge latency mean:           {_fmt_sec(summary['judge_latency_mean_sec'])}")
+    print(f"Judge latency median:         {_fmt_sec(summary['judge_latency_median_sec'])}")
+    print(f"Judge latency p95:            {_fmt_sec(summary['judge_latency_p95_sec'])}")
     print("=" * 72)
-    print(f"\nJSON report written to {out_path}")
 
-    write_markdown_report(md_path, summary, results)
-    print(f"Markdown report written to {md_path}")
 
-    return summary
+def _markdown_report(report: dict[str, Any]) -> str:
+    metadata = report["metadata"]
+    lines = [
+        f"# Sovereign Financial Analyst — {metadata['dataset_split']} evaluation",
+        "",
+        "## Methodology",
+        "",
+        "- **Metadata retrieval hit** checks expected company + section labels in returned citation metadata. It is not retrieval recall.",
+        "- **Evidence retrieval recall@k** is micro-averaged required gold evidence spans found in the exact generation context / total required spans.",
+        "- **Claim groundedness** is micro-averaged supported factual claims / total factual claims. A judge-supported claim is downgraded if its evidence quote cannot be traced to the exact context.",
+        "- **Answer groundedness** is the fraction of successfully graded factual answers for which every factual claim is supported.",
+        "- **Answer fact completeness** is expected facts detected in the answer / total expected facts; it is separate from faithfulness.",
+        "- Missing gold annotations and judge failures are **UNGRADED**, not converted to 0 or 1.",
+        "",
+        "## Reproducibility",
+        "",
+        f"- Benchmark run ID: `{metadata['benchmark_run_id']}`",
+        f"- Git commit: `{metadata.get('git_commit_sha') or 'unavailable'}`",
+        f"- Mode: `{metadata['mode']}`",
+        f"- k: `{metadata['k']}`",
+        f"- Generation model: `{metadata['generation_provider']} / {metadata['generation_model']}`",
+        f"- Judge model: `{metadata['judge_provider']} / {metadata['judge_model']}`",
+        f"- Embedding model: `{metadata['embedding_model']}`",
+        f"- Dataset: `{metadata['dataset_name']} {metadata['dataset_version']}` ({metadata['dataset_split']})",
+        f"- Runs: `{metadata['runs']}`",
+        "",
+    ]
+
+    for run in report["runs"]:
+        s = run["summary"]
+        lines += [
+            f"## Run {run['run_number']}",
+            "",
+            "| Metric | Result |",
+            "|---|---:|",
+            f"| Company routing accuracy | {_fmt_pct(s['company_routing_accuracy'])} |",
+            f"| Section routing accuracy | {_fmt_pct(s['section_routing_accuracy'])} |",
+            f"| Metadata retrieval hit | {_fmt_pct(s['metadata_retrieval_hit_rate'])} |",
+            f"| Evidence retrieval recall@k | {_fmt_pct(s['evidence_retrieval_recall_at_k'])} ({s['evidence_items_found']}/{s['evidence_items_total']}) |",
+            f"| Answer groundedness | {_fmt_pct(s['answer_groundedness'])} ({s['answers_grounded']}/{s['answers_groundedness_graded']}) |",
+            f"| Claim groundedness (micro) | {_fmt_pct(s['claim_groundedness_micro'])} ({s['supported_claims']}/{s['total_factual_claims']}) |",
+            f"| Answer fact completeness | {_fmt_pct(s['answer_fact_completeness'])} ({s['expected_facts_found']}/{s['expected_facts_total']}) |",
+            f"| Abstentions | {s['abstentions']} |",
+            f"| Groundedness questions graded | {s['judge_graded']} |",
+            f"| Groundedness questions ungraded | {s['judge_ungraded']} |",
+            f"| Judge errors | {s['judge_errors']} |",
+            f"| Judge coverage | {_fmt_pct(s['judge_coverage'])} |",
+            f"| Application median latency | {_fmt_sec(s['application_latency_median_sec'])} |",
+            f"| Application p95 latency | {_fmt_sec(s['application_latency_p95_sec'])} |",
+            "",
+            "### Failures / ungraded items",
+            "",
+        ]
+        failures = [
+            r for r in run["results"]
+            if (
+                not r["metadata_retrieval_hit"]
+                or r["evidence_status"] != "GRADED"
+                or r["evidence_question_success"] is False
+                or r["groundedness_status"] in {"JUDGE_ERROR"}
+                or r["answer_grounded"] is False
+                or r["completeness_status"] != "GRADED"
+                or (r["answer_fact_completeness"] is not None and r["answer_fact_completeness"] < 1.0)
+                or r["abstention_correctness"] == "INCORRECT"
+            )
+        ]
+        if not failures:
+            lines.append("None.")
+        for r in failures:
+            reasons: list[str] = []
+            if not r["metadata_retrieval_hit"]:
+                reasons.append("metadata retrieval miss")
+            if r["evidence_status"] != "GRADED":
+                reasons.append("evidence UNGRADED")
+            elif r["evidence_question_success"] is False:
+                reasons.append("gold evidence miss")
+            if r["groundedness_status"] == "JUDGE_ERROR":
+                reasons.append("JUDGE_ERROR")
+            elif r["answer_grounded"] is False:
+                reasons.append("unsupported factual claim(s)")
+            if r["completeness_status"] != "GRADED":
+                reasons.append("completeness UNGRADED")
+            elif r["answer_fact_completeness"] is not None and r["answer_fact_completeness"] < 1.0:
+                reasons.append("incomplete answer")
+            if r["abstention_correctness"] == "INCORRECT":
+                reasons.append("incorrect abstention")
+            lines.append(f"- **{r['id']}**: {', '.join(reasons)} — {r['question']}")
+        lines.append("")
+
+    if report.get("across_runs"):
+        lines += ["## Across-run variability", ""]
+        for name, values in report["across_runs"].items():
+            mean = values.get("mean")
+            std = values.get("std")
+            lines.append(
+                f"- `{name}`: mean={mean:.4f}, std={std:.4f}, n={values['n']}"
+                if mean is not None
+                else f"- `{name}`: UNGRADED"
+            )
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _across_run_stats(runs: Sequence[dict[str, Any]], mode: str) -> dict[str, dict[str, Any]]:
+    metrics = {
+        "answer_groundedness",
+        "claim_groundedness_micro",
+        "answer_fact_completeness",
+        "evidence_retrieval_recall_at_k",
+        "metadata_retrieval_hit_rate",
+        "judge_error_rate",
+    }
+    if mode == "agentic":
+        metrics |= {
+            "company_routing_accuracy",
+            "section_routing_accuracy",
+            "avg_search_calls_per_question",
+        }
+
+    output: dict[str, dict[str, Any]] = {}
+    for metric in sorted(metrics):
+        values = [run["summary"].get(metric) for run in runs]
+        numeric = [float(v) for v in values if v is not None]
+        output[metric] = {
+            "mean": statistics.fmean(numeric) if numeric else None,
+            "std": statistics.pstdev(numeric) if len(numeric) > 1 else (0.0 if numeric else None),
+            "n": len(numeric),
+        }
+    return output
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--mode", choices=["rule_based", "agentic"], default="rule_based")
+    parser.add_argument("--dataset-module", default="dataset")
+    parser.add_argument("--category")
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--skip-groundedness", action="store_true")
+    parser.add_argument(
+        "--k",
+        type=int,
+        default=None,
+        help=(
+            "Compatibility check only. The harness evaluates the production retrieval k and will "
+            "reject a different value rather than silently changing retrieval for the benchmark."
+        ),
+    )
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--markdown", type=Path)
+    return parser.parse_args()
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Eval harness for Sovereign Financial Analyst")
-    parser.add_argument("--mode", choices=["rule_based", "agentic", "both"], default="rule_based",
-                         help="which routing strategy to evaluate. 'rule_based' (default) preserves the "
-                              "original Phase 1 behavior and default file paths. 'agentic' runs the LLM "
-                              "tool-calling router instead. 'both' runs each in turn and prints/writes a "
-                              "head-to-head comparison.")
-    parser.add_argument("--category", choices=["business", "risk_factors", "mdna", "financial_statements"],
-                         help="only run questions from this section")
-    parser.add_argument("--limit", type=int, default=None, help="only run the first N questions (after filtering)")
-    parser.add_argument("--k", type=int, default=4, help="retrieval k (default matches app.tools default of 4)")
-    parser.add_argument("--skip-groundedness", action="store_true",
-                         help="skip the LLM-as-judge pass; retrieval metrics only (much faster)")
-    parser.add_argument("--sleep", type=float, default=0.0,
-                         help="seconds to pause between questions (helps if Ollama/GPU backend is unstable "
-                              "under back-to-back calls, e.g. macOS Metal OOM crashes)")
-    parser.add_argument("--out", type=str, default=None,
-                         help="path to write the JSON report (single-mode runs only; ignored for --mode both, "
-                              "defaults to eval/report.json for rule_based, eval/report_agentic.json for agentic)")
-    parser.add_argument("--md-out", type=str, default=None,
-                         help="path to write the Markdown report (single-mode runs only; same default rule as --out)")
-    args = parser.parse_args()
+    args = parse_args()
+    if args.runs < 1:
+        raise SystemExit("--runs must be >= 1")
 
-    questions = EVAL_QUESTIONS
+    questions, dataset_meta = _load_dataset(args.dataset_module)
     if args.category:
-        questions = [q for q in questions if q["category"] == args.category]
-    if args.limit:
+        questions = [q for q in questions if q.get("category") == args.category]
+    if args.limit is not None:
         questions = questions[: args.limit]
-
     if not questions:
-        print("No questions match the given filters.")
-        return 1
+        raise SystemExit("No evaluation questions matched the requested filters.")
 
-    default_paths = {
-        "rule_based": (REPO_ROOT / "eval" / "report.json", REPO_ROOT / "eval" / "report.md"),
-        "agentic": (REPO_ROOT / "eval" / "report_agentic.json", REPO_ROOT / "eval" / "report_agentic.md"),
+    app = _load_app_components()
+    production_k = int(app["production_k"])
+    if args.k is not None and args.k != production_k:
+        raise SystemExit(
+            f"Refusing --k {args.k}: production query_financial_reports currently uses k={production_k}. "
+            "This harness does not alter retrieval settings merely to change benchmark scores."
+        )
+
+    benchmark_run_id = str(uuid.uuid4())
+    groundedness_enabled = not args.skip_groundedness
+    judge_llm = _build_judge_llm(app) if groundedness_enabled else None
+
+    default_json = EVAL_DIR / ("report_agentic.json" if args.mode == "agentic" else "report.json")
+    out_path = args.out or default_json
+    md_path = args.markdown or out_path.with_suffix(".md")
+
+    git_meta = _git_metadata()
+    judge_meta = _judge_metadata(app)
+    report_metadata = {
+        **git_meta,
+        **dataset_meta,
+        **judge_meta,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "benchmark_run_id": benchmark_run_id,
+        "mode": args.mode,
+        "k": production_k,
+        "generation_provider": app["generation_provider"],
+        "generation_model": app["generation_model"],
+        "embedding_model": app["embedding_model"],
+        "number_of_questions": len(questions),
+        "groundedness_enabled": groundedness_enabled,
+        "runs": args.runs,
     }
 
-    if args.mode == "both":
-        summary_rb = run_eval(questions, "rule_based", args, *default_paths["rule_based"])
-        summary_ag = run_eval(questions, "agentic", args, *default_paths["agentic"])
-        print_comparison(summary_rb, summary_ag)
-        comparison_path = REPO_ROOT / "eval" / "comparison.md"
-        write_comparison_report(comparison_path, summary_rb, summary_ag)
-        print(f"\nComparison report written to {comparison_path}")
-        return 0
+    missing_evidence = sum(not q.get("gold_evidence") for q in questions)
+    missing_facts = sum(not q.get("expected_facts") for q in questions)
+    if missing_evidence or missing_facts:
+        print(
+            "Gold-label coverage warning: "
+            f"{missing_evidence}/{len(questions)} questions lack gold_evidence; "
+            f"{missing_facts}/{len(questions)} lack expected_facts. "
+            "Those metrics will be UNGRADED rather than guessed."
+        )
 
-    default_json, default_md = default_paths[args.mode]
-    out_path = Path(args.out) if args.out else default_json
-    md_path = Path(args.md_out) if args.md_out else default_md
-    run_eval(questions, args.mode, args, out_path, md_path)
+    runs: list[dict[str, Any]] = []
+    for run_number in range(1, args.runs + 1):
+        print(f"\nRun {run_number}/{args.runs} — mode={args.mode}, k={production_k}")
+        results: list[dict[str, Any]] = []
+        for item in questions:
+            result = evaluate_question(
+                item,
+                args.mode,
+                app,
+                judge_llm,
+                groundedness_enabled,
+            )
+            results.append(result)
+            print_question_result(result)
+
+        summary = aggregate_results(results)
+        print_summary(summary, args.mode)
+        runs.append({"run_number": run_number, "summary": summary, "results": results})
+
+    report = {
+        "metadata": {
+            **report_metadata,
+            "judge_error_count": sum(run["summary"]["judge_errors"] for run in runs),
+        },
+        "runs": runs,
+        "across_runs": _across_run_stats(runs, args.mode) if args.runs > 1 else None,
+    }
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    md_path.write_text(_markdown_report(report), encoding="utf-8")
+    print(f"\nJSON report: {out_path}")
+    print(f"Markdown report: {md_path}")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
