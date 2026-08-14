@@ -6,17 +6,18 @@
 ![LangChain](https://img.shields.io/badge/Framework-LangChain-1C3C3C)
 ![ChromaDB](https://img.shields.io/badge/VectorDB-ChromaDB-orange)
 ![Docker](https://img.shields.io/badge/Container-Docker-2496ED)
-![Tests](https://img.shields.io/badge/tests-68%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-108-blue)
 
-**Sovereign Financial Analyst** is a Retrieval-Augmented Generation system for analyzing SEC 10-K filings and live stock data. It answers natural-language questions about corporate filings — risk factors, revenue trends, business segments, financial statements, cross-company comparisons — grounded in retrieved source text, with citations back to the exact filing and section every answer draws from.
+**Sovereign Financial Analyst** is an evaluation-driven Retrieval-Augmented Generation system for analyzing SEC 10-K filings and live stock data. It answers natural-language questions about business segments, risk factors, MD&A, financial statements, and market performance using retrieved filing evidence and structured market data.
 
-The system indexes **20 public companies** across **fiscal years 2023-2025**, section-aware (Business, Risk Factors, MD&A, and Financial Statements retrieved independently rather than as one undifferentiated blob), and supports two interchangeable query-routing strategies and two interchangeable LLM backends, so the same codebase runs entirely offline on a laptop or behind a public API with zero code changes -- only configuration.
+The system indexes **20 public companies** across **fiscal years 2023–2025** and keeps Business, Risk Factors, MD&A, and Financial Statements as separate retrieval domains. It includes both a deterministic rule-based baseline and an LLM-driven agentic router, plus local Ollama and hosted Groq backends through the same LLM interface.
 
 ```text
 What are Nvidia's supply chain risks?
 Compare Nvidia and AMD's risk factors.
-What is Nvidia's revenue trend from the filing?
-How is NVDA stock performing?
+What does Microsoft's MD&A say about revenue growth?
+How is NVDA stock performing today?
+What are Nvidia's main risks and how is its stock performing today?
 ```
 
 ---
@@ -26,6 +27,7 @@ How is NVDA stock performing?
 - [Why this exists](#why-this-exists)
 - [Architecture](#architecture)
 - [Query routing: rule-based vs. agentic](#query-routing-rule-based-vs-agentic)
+- [Retrieval and synthesis](#retrieval-and-synthesis)
 - [Evaluation](#evaluation)
 - [Testing](#testing)
 - [Tech stack](#tech-stack)
@@ -42,124 +44,182 @@ How is NVDA stock performing?
 
 ## Why this exists
 
-10-K filings are long, dense, and hard to navigate even for people who read them for a living. This project retrieves only the relevant section of the relevant filing for a given question, then has an LLM synthesize a grounded answer from that retrieved text -- not from the model's own training data. Every claim in an answer traces back to a cited filing section, and the system is built to say a fact isn't available in the indexed filings rather than guess when it isn't actually in the retrieved context.
+10-K filings are long, dense, and difficult to navigate. This project retrieves the relevant company, filing section, and fiscal year for a question, then synthesizes an answer from the retrieved evidence instead of relying on the model's parametric knowledge alone.
 
-It's also a deliberately end-to-end build: ingestion, retrieval, two routing strategies, an evaluation harness that measures whether the grounding claim actually holds, a REST API decoupled from the UI, a test suite, containerization, and a CI/CD pipeline -- the full path from a RAG prototype to something another engineer could actually run.
+The project is deliberately end-to-end: SEC ingestion, section-aware chunking, hybrid retrieval, two routing strategies, evidence-aware synthesis, deterministic financial extraction, live market-data lookup, an evaluation harness, REST API, Streamlit UI, automated tests, containerization, and CI/CD.
+
+The evaluation layer is part of the system rather than an afterthought. Retrieval quality, answer completeness, routing, latency, and groundedness are measured separately so improvements in one area don't hide regressions in another.
 
 ---
 
 ## Architecture
 
-```
-                        +------------------+
-                        |   Streamlit UI   |
-                        +---------+--------+
+```text
+                         +------------------+
+                         |  Streamlit UI    |
+                         +--------+---------+
                                   |
-                        +---------v--------+
-                        |  FastAPI service |   (api/main.py)
-                        |  /query /health  |
-                        |  /companies      |
-                        +---------+--------+
+                         +--------v---------+
+                         | FastAPI service  |
+                         | /query /health   |
+                         | /companies       |
+                         +--------+---------+
                                   |
-                 +----------------+-----------------+
-                 |                                  |
-        +--------v---------+              +---------v----------+
-        |  rule_based mode |              |   agentic mode     |
-        |  (app/agent.py)  |              |(app/agentic_router)|
-        |  keyword/regex   |              |  LLM tool-calling  |
-        |  routing         |              | decides tool calls |
-        +--------+---------+              +---------+----------+
-                 |                                  |
-                 +----------------+-----------------+
+                 +----------------+----------------+
+                 |                                 |
+        +--------v---------+              +--------v----------+
+        | rule_based mode  |              |   agentic mode    |
+        | deterministic    |              | LLM tool routing  |
+        | intent + section |              | + arg sanitation  |
+        +--------+---------+              +--------+----------+
+                 |                                 |
+                 +----------------+----------------+
                                   |
-                 +----------------+-----------------+
-                 |                                  |
-        +--------v---------+              +---------v------------+
-        | query_financial_ |              | get_stock_performance|
-        | reports (Chroma) |              |      (yfinance)      |
-        +--------+---------+              +----------------------+
-                 |
-        +--------v---------+
-        |  LLM synthesis   |   (Ollama, local -- or Groq, hosted)
-        |  with citations  |
-        +------------------+
+                 +----------------+----------------+
+                 |                                 |
+        +--------v---------+              +--------v----------+
+        | Filing retrieval |              | Live market data  |
+        | Chroma + BM25    |              | yfinance          |
+        +--------+---------+              +--------+----------+
+                 |                                 |
+        +--------v---------+                       |
+        | RRF + dedupe     |                       |
+        +--------+---------+                       |
+                 |                                 |
+        +--------v------------------+              |
+        | Evidence processing       |              |
+        | - prose distillation      |              |
+        | - financial extraction    |              |
+        +--------+------------------+              |
+                 |                                 |
+                 +----------------+----------------+
+                                  |
+                         +--------v---------+
+                         | Final response   |
+                         | + citations      |
+                         +------------------+
 ```
 
-- **Ingestion** (`scripts/ingest.py`) pulls 10-K filings via the SEC API, splits them into sections (Business, Risk Factors, MD&A, Financial Statements) rather than treating a filing as one document, chunks each section, embeds the chunks, and persists them to a local ChromaDB store tagged with company, fiscal year, and section metadata.
-- **Retrieval** filters by company/section/fiscal-year metadata before running similarity search, so a question about Apple's risk factors only searches Apple's risk factors -- not all 20 companies' filings.
-- **Synthesis** takes the retrieved chunks plus the user's question and asks the LLM to answer using only that context, with a citation for every section it drew from.
-- **The API and UI are decoupled**: the FastAPI service can be called, tested, and deployed independently of the Streamlit UI. Streamlit is a thin client on top of the same `app.agent` / `app.agentic_router` logic the API exposes.
+Ingestion (`scripts/ingest.py`) downloads and processes the SEC 10-K filings, separates Business, Risk Factors, MD&A, and Financial Statements, chunks the text, embeds it, and persists it to ChromaDB with company, fiscal-year, and section metadata.
+
+Retrieval constrains the search space by metadata first, then combines dense vector search with BM25 lexical retrieval. Reciprocal Rank Fusion (RRF) merges the ranked lists and drops duplicate evidence. Before generation, prose synthesis distills that evidence down so the LLM works from a smaller, more relevant context.
+
+Financial-statement questions mostly skip the LLM: deterministic extraction pulls exact values instead of asking the model to reproduce them from long tables. Stock-only and mixed filing/stock queries go through structured yfinance data instead, with market values formatted deterministically so the model can't quietly drop or rewrite a number.
+
+The API and UI are decoupled. FastAPI can be called or deployed on its own, and Streamlit is just a thin client sitting on top of the same application logic.
 
 ---
 
 ## Query routing: rule-based vs. agentic
 
-The system supports two ways of deciding which tools to call for a given question, selectable per-request via the API's `mode` field:
+The system supports two query-routing strategies.
 
-**`rule_based`** (default) -- keyword and regex matching in `app/agent.py` identifies the company, section, and required tools deterministically. Fast, predictable, and -- per the evaluation numbers below -- currently the more accurate of the two.
+### `rule_based`
 
-**`agentic`** -- the LLM itself decides which tools to call and with what arguments, via real LangChain tool-calling (`app/agentic_router.py`), not a scripted call sequence. Slower and, on the current small local model, somewhat less reliable at both company-name extraction and staying strictly within retrieved context -- but it's a genuine tool-calling agent, not a rule-based system dressed up as one.
+A deterministic baseline in `app/agent.py` uses company aliases, keyword/regex section inference, and explicit filing/stock intent detection. It's fast and reproducible, and it's kept around as a comparison baseline.
 
-Both modes call the same underlying tools (`query_financial_reports`, `get_stock_performance`) and go through the same LLM-synthesis step; the only difference is how the decision to call a tool gets made.
+### `agentic`
+
+The main agentic path in `app/agentic_router.py` lets the LLM select tools and generate tool arguments. Arguments are sanitized and normalized before retrieval so free-form model output can't directly become an unsafe or invalid lookup.
+
+Both modes ultimately use the same underlying filing and market-data capabilities. The difference is how the system decides what to retrieve and how the final filing answer gets assembled.
+
+---
+
+## Retrieval and synthesis
+
+The filing path uses a hybrid retrieval pipeline rather than vector similarity alone:
+
+```text
+Query
+  |
+  +--> metadata filter (company / section / fiscal year)
+  |
+  +--> dense semantic retrieval
+  |
+  +--> BM25 lexical retrieval
+          |
+          v
+     Reciprocal Rank Fusion
+          |
+          v
+        dedupe
+          |
+          v
+  evidence processing / extraction
+          |
+          v
+      final answer
+```
+
+This helps with filing language where exact terminology, accounting labels, or risk-factor wording can matter even when semantic similarity is weak.
+
+For prose-heavy sections like Business, Risk Factors, and MD&A, the system builds an evidence brief before synthesis. For financial statements, deterministic extraction is preferred for exact values when the retrieved context supports it.
 
 ---
 
 ## Evaluation
 
-Retrieval quality and answer groundedness are both measured, not assumed. `eval/eval.py` runs a hand-labeled set of 28 questions spanning all 20 companies and all four sections (Business, Risk Factors, MD&A, Financial Statements) end-to-end through the live system, checks whether retrieval pulled the expected company/section, and grades every answer for groundedness using an LLM-as-judge pass -- with the judge deliberately run on a separate, stronger model from whichever model answers questions, since a small model grading its own answers produces unreliable, sometimes self-contradictory verdicts.
+The system is evaluated on a **28-question development/regression benchmark** spanning Business, Risk Factors, MD&A, and Financial Statements. The benchmark contains **46 gold evidence items** and **71 expected answer facts**.
 
-| Metric                     | rule_based | agentic |
-| -------------------------- | ---------- | ------- |
-| Retrieval recall@k         | **100%**   | 92.9%   |
-| Company routing accuracy   | **100%**   | 92.9%   |
-| Groundedness (LLM-judged)  | **92.9%**  | 82.1%   |
-| Avg. tool calls / question | n/a        | 1.0     |
+| Metric                      |    Rule-Based |       Agentic |
+| --------------------------- | ------------: | ------------: |
+| Company routing accuracy    |        100.0% |        100.0% |
+| Section routing accuracy    |        100.0% |        100.0% |
+| Metadata retrieval hit rate |        100.0% |        100.0% |
+| Evidence retrieval recall@8 | 63.0% (29/46) | 69.6% (32/46) |
+| Answer fact completeness    | 49.3% (35/71) | 83.1% (59/71) |
+| Manual answer groundedness  | 71.4% (20/28) | 71.4% (20/28) |
+| Tool errors                 |             0 |             0 |
+
+The agentic pipeline substantially improves answer completeness while holding groundedness steady. The rule-based path is still useful as a deterministic baseline, and it's faster in end-to-end runs.
+
+Groundedness was manually evaluated against the exact retrieved `generation_context` saved for each answer. Missing expected facts reduce completeness, but they don't count as hallucinations unless the answer actually states an unsupported claim.
+
+The benchmark was used during development and regression testing, so these results shouldn't be read as held-out test performance.
+
+Regression testing was also used to reject changes that improved one metric while degrading overall behavior. Diversity-oriented reranking, ordered-neighbor retrieval, and stricter synthesis constraints were all tried and dropped after they reduced answer completeness or introduced new response-quality failures.
+
+See [`eval/comparison.md`](eval/comparison.md) for the compact rule-based vs. agentic comparison and the final JSON artifacts for per-question details.
+
+### Reproduce the evaluation
 
 ```bash
-python eval/eval.py --mode both
+python eval/eval.py --mode rule_based --dataset-module dataset --skip-groundedness
+python eval/eval.py --mode agentic --dataset-module dataset --skip-groundedness
 ```
 
-Produces `eval/report.json` and `eval/report_agentic.json` with full per-question results (routed company/section, retrieval hit/miss, groundedness verdict, cited unsupported claims where applicable, latency) alongside the summary above.
-
-**Reading the gap:** agentic mode's two retrieval misses trace to a specific, real bug -- the LLM's tool-calling arguments sometimes include the full legal suffix (e.g. "tesla, inc." instead of "tesla"), which isn't normalized before the company lookup, so retrieval correctly returns nothing rather than silently guessing. That's a fixable normalization gap in the agentic path specifically, not a retrieval-index problem -- rule_based's keyword extraction doesn't hit this because it never passes free-form LLM-generated text through as a lookup key.
+The automated groundedness judge isn't used for the final reported groundedness numbers — small local judge models were too inconsistent to serve as an authoritative evaluator.
 
 ---
 
 ## Testing
 
-68 tests across routing, tools, ingestion's section-splitting logic, and the API layer, all runnable without any external services -- Ollama, ChromaDB, and yfinance are stubbed in `tests/conftest.py` so the suite exercises actual logic rather than mocked-out no-ops, without requiring a running LLM or a built vector store.
+The pytest suite contains **108 tests** covering routing, tool-argument sanitation, hybrid retrieval, evidence processing, deterministic financial answers, ingestion, evaluation metrics, stock tools, and API behavior.
+
+External dependencies like Ollama, ChromaDB, and yfinance are stubbed where it makes sense, so tests can exercise application logic without every external service needing to be live.
 
 ```bash
-pytest -v
+pytest -q
+```
+
+Linting:
+
+```bash
+ruff check app api ui scripts eval tests
 ```
 
 ---
 
 ## Tech stack
 
-**Backend / API** -- FastAPI, Pydantic, Uvicorn, structured JSON logging
-
-**LLM** -- pluggable via `LLM_PROVIDER`: local Ollama (privacy-first, no external calls) or hosted Groq (used for the public deploy, since a public URL can't require visitors to run a local model). Same `app/llm.py` factory, same call sites either way.
-
-**Retrieval** -- ChromaDB, LangChain, HuggingFace `sentence-transformers/all-MiniLM-L6-v2` embeddings
-
-**Orchestration** -- LangChain (rule-based tool calls + true LLM tool-calling for agentic mode)
-
-**Data sources** -- SEC filings via `sec-api`, live market data via `yfinance`
-
-**UI** -- Streamlit
-
-**Testing / quality** -- pytest, ruff
-
-**Containerization** -- Docker (multi-stage: separate `api`/`ui` build targets), Docker Compose for local orchestration
-
-**CI/CD** -- GitHub Actions (lint, then test, then deploy -- gated on tests passing)
+Backend and API run on FastAPI with Pydantic and Uvicorn, plus structured JSON logging. Ollama handles local inference, with Groq available through the same provider interface for hosted deployments. Retrieval uses ChromaDB, HuggingFace's `sentence-transformers/all-MiniLM-L6-v2` for embeddings, BM25 for lexical search, and Reciprocal Rank Fusion to merge the two. LangChain handles tool calling for the agentic path; the baseline routes deterministically instead. Filing data comes from SEC 10-Ks, market data from `yfinance`. The UI is Streamlit. Tests run on pytest, linting on ruff. Everything is containerized with Docker and Docker Compose, and CI/CD runs through GitHub Actions.
 
 ---
 
 ## Local setup
 
-### Option A -- native (no Docker)
+### Option A — native
 
 ```bash
 git clone https://github.com/Siddharth-16/Sovereign-Financial-Analyst.git
@@ -169,11 +229,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Install and run [Ollama](https://ollama.ai), then pull a model:
+Install and start [Ollama](https://ollama.ai), then pull the default local model:
 
 ```bash
 ollama serve
-ollama pull llama3.1
+ollama pull llama3.2:3b
 ```
 
 Download filings and build the vector store:
@@ -183,7 +243,7 @@ python scripts/data.py
 python scripts/ingest.py
 ```
 
-Section splitting relies on exact heading-string matches, which can fail silently on filings with non-standard HTML formatting. After ingesting, confirm every company times fiscal year actually produced all four sections:
+Check ingestion coverage:
 
 ```bash
 python scripts/check_coverage.py
@@ -192,17 +252,17 @@ python scripts/check_coverage.py
 Run the API and/or UI:
 
 ```bash
-uvicorn api.main:app --reload   # API at http://localhost:8000/docs
-streamlit run ui/ui.py          # UI at http://localhost:8501
+uvicorn api.main:app --reload   # http://localhost:8000/docs
+streamlit run ui/ui.py          # http://localhost:8501
 ```
 
-### Option B -- Docker Compose
+### Option B — Docker Compose
 
-Ollama runs natively on your host, not inside a container -- Docker Desktop on macOS/Windows has no GPU access from inside its Linux VM, so a containerized Ollama is CPU-only and noticeably slower. Only the API/UI are containerized; they reach your host's Ollama via `host.docker.internal`.
+Ollama can run natively on the host while the API/UI run in containers.
 
 ```bash
 ollama serve
-ollama pull llama3.2:3b   # or llama3.1 if you have 16GB+ RAM
+ollama pull llama3.2:3b
 
 cp .env.example .env
 docker compose up --build api ui
@@ -211,7 +271,7 @@ docker compose up --build api ui
 - API: `http://localhost:8000/docs`
 - UI: `http://localhost:8501`
 
-If you're on Linux with a GPU and want Ollama containerized too:
+If your environment supports containerized Ollama:
 
 ```bash
 docker compose --profile containerized-ollama up --build
@@ -221,129 +281,129 @@ docker compose --profile containerized-ollama up --build
 
 ## Deployment
 
-The API is containerized separately from the UI (`Dockerfile`, multi-stage, `api`/`ui` targets) so either can be deployed independently.
+The API and UI have separate Docker build targets so they can be deployed independently.
 
-### Render
+The repository includes configuration for hosted deployment. Public deployments should use a hosted inference provider unless the deployment environment can also run Ollama.
 
-Connect the repo via the Render dashboard: **New -> Blueprint**. Render reads `render.yaml` and creates the service; you'll be prompted once for `GROQ_API_KEY` and `SEC_API_KEY`. The public deploy uses hosted inference (Groq) instead of Ollama, since a public URL can't require visitors to run a local model. Render's free tier doesn't require billing details, sleeps after 15 minutes of inactivity, and takes 30-60 seconds to wake on the next request.
-
-### Fly.io (alternative, requires a card on file)
-
-```bash
-flyctl launch --no-deploy --copy-config --name sovereign-financial-analyst
-flyctl secrets set GROQ_API_KEY=... SEC_API_KEY=...
-flyctl deploy --dockerfile Dockerfile --build-target api
-```
-
-### Build the image directly
+Build images directly with:
 
 ```bash
 docker build --target api -t sovereign-fa-api .
-docker build --target ui  -t sovereign-fa-ui .
+docker build --target ui -t sovereign-fa-ui .
 ```
 
-If a `chroma_db/` directory exists locally at build time, it's baked into the image automatically. Otherwise, mount a populated one at runtime.
+If `chroma_db/` exists at build time it can be included in the image; otherwise mount or provision a populated vector store at runtime.
 
 ---
 
 ## Environment variables
 
-Full list in `.env.example`. The ones that matter most:
+See `.env.example` for the full list.
 
-| Variable                      | Default                  | Notes                                                                                                                                                           |
-| ----------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LLM_PROVIDER`                | `ollama`                 | `ollama` for local/private, `groq` for the public deploy                                                                                                        |
-| `OLLAMA_BASE_URL`             | `http://localhost:11434` | Use `host.docker.internal` from inside a container reaching a host Ollama                                                                                       |
-| `GROQ_API_KEY` / `GROQ_MODEL` | --                       | Required only when `LLM_PROVIDER=groq`                                                                                                                          |
-| `CHROMA_PATH`                 | `./chroma_db`            | Point at a mounted volume in containerized setups                                                                                                               |
-| `SEC_API_KEY`                 | --                       | Required for ingestion (`scripts/data.py`, `scripts/ingest.py`); not needed at query time                                                                       |
-| `WARMUP_ENABLED`              | `true`                   | Pre-loads the embedding model and LLM client on startup so the first user query isn't slow. Disabled on the Render deploy specifically -- see Known limitations |
+| Variable                      | Default                  | Notes                                                                 |
+| ----------------------------- | ------------------------ | --------------------------------------------------------------------- |
+| `LLM_PROVIDER`                | `ollama`                 | `ollama` for local inference; `groq` for hosted inference             |
+| `OLLAMA_BASE_URL`             | `http://localhost:11434` | Use `host.docker.internal` when a container connects to host Ollama   |
+| `OLLAMA_MODEL`                | `llama3.2:3b`            | Default local generation model                                        |
+| `GROQ_API_KEY` / `GROQ_MODEL` | —                        | Required only when `LLM_PROVIDER=groq`                                |
+| `CHROMA_PATH`                 | `./chroma_db`            | Local or mounted ChromaDB path                                        |
+| `SEC_API_KEY`                 | —                        | Required for ingestion, not for querying an already-built local index |
+| `WARMUP_ENABLED`              | `true`                   | Controls application startup warmup behavior                          |
 
 ---
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml` runs on every push/PR:
+`.github/workflows/ci-cd.yml` runs the quality gates configured for the project on pushes and pull requests:
 
-1. **Lint** -- `ruff check`, scoped to real bugs (undefined names, unused imports, syntax errors) rather than full style enforcement
-2. **Test** -- the 68-test pytest suite, no external services required
-3. **Deploy** -- on push to `main` only, after tests pass, via Render's deploy hook -- so deploys are gated on a green test run rather than firing on every push regardless of CI status
+1. **Lint** — `ruff check app api ui scripts eval tests`
+2. **Test** — the 108-test pytest suite
+3. **Deploy** — deployment workflow on the configured branch after earlier checks succeed
 
 ---
 
 ## Project structure
 
-```
+```text
 Sovereign-Financial-Analyst/
-
-app/
-   agent.py            rule-based query routing + LLM synthesis
-   agentic_router.py   LLM tool-calling routing (mode="agentic")
-   llm.py              LLM provider factory (ollama / groq)
-   tools.py            retrieval + stock tools
-   config.py           configuration
-   companies.py        single source of truth: company/ticker/section data
-   schemas.py          Pydantic request/response models
-   exceptions.py       typed exceptions
-   logging_config.py   structured JSON logging
-
-api/
-   main.py             FastAPI service
-
-ui/
-   ui.py               Streamlit interface
-
-eval/
-   dataset.py               28-question labeled eval set
-   eval.py                    retrieval recall / routing accuracy / LLM-judged groundedness
-   report.json                 latest rule_based results
-   report_agentic.json         latest agentic results
-
-tests/
-   test_routing.py           rule-based routing logic
-   test_tools.py              retrieval + stock tools
-   test_ingest_splitter.py    section-splitting logic
-   test_api.py                 FastAPI endpoints
-   conftest.py                  stubs for Ollama/Chroma/yfinance -- no external services needed
-
-scripts/
-   data.py                   download SEC 10-K filings
-   ingest.py                  filing ingestion + chunking + embedding pipeline
-   check_coverage.py          verifies ingestion produced all companies x years x sections
-   sync_chroma.py              optional: pull a pre-built chroma_db from S3 on container start
-
-docker/
-   entrypoint-api.sh         api container entrypoint
-   entrypoint-ui.sh           ui container entrypoint
-
-.github/workflows/
-   ci-cd.yml                 lint -> test -> deploy
-
-Dockerfile                   multi-stage build (api / ui targets)
-docker-compose.yml            local orchestration
-render.yaml                    Render deploy config
-fly.toml                        Fly.io deploy config (alternative)
+├── app/
+│   ├── agent.py               # deterministic baseline + response orchestration
+│   ├── agentic_router.py      # LLM tool-calling router
+│   ├── retrieval.py           # dense + BM25 + RRF hybrid retrieval
+│   ├── financial_answer.py    # deterministic financial extraction/answers
+│   ├── prose_evidence.py      # prose evidence distillation
+│   ├── tool_args.py           # tool argument sanitation/normalization
+│   ├── tools.py               # filing and stock tools
+│   ├── llm.py                 # LLM provider factory
+│   ├── companies.py           # company/ticker/section mappings
+│   ├── config.py              # configuration
+│   ├── schemas.py             # Pydantic models
+│   ├── exceptions.py          # typed exceptions
+│   └── logging_config.py      # structured logging
+│
+├── api/
+│   └── main.py                # FastAPI service
+│
+├── ui/
+│   └── ui.py                  # Streamlit interface
+│
+├── eval/
+│   ├── dataset.py             # 28-question development benchmark
+│   ├── eval.py                # end-to-end evaluation runner
+│   ├── metrics.py             # evaluation metrics
+│   ├── comparison.md          # final rule-based vs. agentic summary
+│   ├── final_rule_based.json  # final per-question baseline results
+│   └── final_agentic.json     # final per-question agentic results
+│
+├── tests/
+│   ├── test_api.py
+│   ├── test_eval_metrics.py
+│   ├── test_financial_answer.py
+│   ├── test_hybrid_retrieval.py
+│   ├── test_ingest_splitter.py
+│   ├── test_prose_evidence.py
+│   ├── test_retrieval_prose.py
+│   ├── test_routing.py
+│   ├── test_tool_args.py
+│   ├── test_tool_args_prose.py
+│   ├── test_tools.py
+│   └── conftest.py
+│
+├── scripts/
+│   ├── data.py
+│   ├── ingest.py
+│   └── check_coverage.py
+│
+├── .github/workflows/
+│   └── ci-cd.yml
+│
+├── Dockerfile
+├── docker-compose.yml
+├── render.yaml
+└── README.md
 ```
 
 ---
 
 ## Known limitations
 
-- **Render's free tier (512MB) is tight for this stack.** `/health` and light traffic are fine; sustained real query traffic has triggered out-of-memory errors on that tier during testing. The application runs correctly end-to-end -- verified locally and via Docker -- the constraint is specifically the free-tier resource ceiling, not the code.
-- **Agentic mode's company-name normalization gap** (see Evaluation above) causes occasional retrieval misses when the LLM's tool-calling arguments include a legal suffix the lookup doesn't normalize away.
-- **One documented, repeatable hallucination pattern** on Pfizer risk-factor questions surfaced during evaluation and is tracked as a known limitation rather than silently accepted.
-- Financial-statement questions for companies whose statements weren't cleanly extracted during ingestion correctly return that a fact isn't available in the indexed filings rather than guessing
+- The 28-question benchmark is a **development/regression set**, not a held-out test set. Results may overestimate generalization to a completely unseen question distribution.
+- Agentic evidence recall is **69.6%**, so retrieval still misses some required evidence even when company/section routing is correct.
+- The local `llama3.2:3b` model keeps the project laptop-friendly, but it can still produce incomplete or unsupported prose. The evaluation framework is built to surface those failures rather than hide them.
+- SEC filings vary a lot in HTML/table structure, so ingestion quality depends on how cleanly a filing can be sectioned and parsed.
+- Live stock queries depend on `yfinance` availability and reflect the latest data that provider returns, not an exchange-grade real-time feed.
+- Public hosted deployments may need more memory and a hosted inference provider than the local setup does.
 
 ---
 
 ## Possible extensions
 
-- Fix the agentic-mode company-name normalization gap
-- Vector reranking on top of the initial similarity search
-- Dynamic PDF ingestion from the UI, beyond the pre-ingested 20-company set
-- Financial metric extraction into structured (not just prose) output
-- Historical trend visualizations
-- Earnings call transcript analysis
+- Build a larger held-out benchmark for a cleaner estimate of generalization
+- Add structured financial-metric extraction across more statement line items
+- Support dynamic filing/PDF ingestion from the UI
+- Add historical trend visualizations
+- Add earnings-call transcript analysis
+- Evaluate a stronger local model while keeping the same frozen retrieval benchmark
 
 ---
 
