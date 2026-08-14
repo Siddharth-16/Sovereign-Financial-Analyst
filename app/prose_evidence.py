@@ -1,8 +1,6 @@
 from __future__ import annotations
-
 import html
 import re
-from typing import Iterable
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:[.&%-][a-z0-9]+)*", re.IGNORECASE)
 _STOPWORDS = {
