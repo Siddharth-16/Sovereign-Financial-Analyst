@@ -14,6 +14,7 @@ from app.companies import (
     SECTION_DISPLAY_MAP,
 )
 from app.exceptions import VectorStoreUnavailableError
+from app.retrieval import hybrid_retrieve
 
 logger = logging.getLogger("sovereign_fa.tools")
 
@@ -118,6 +119,113 @@ def format_stock_citation(ticker: str) -> str:
     return f"{ticker} market data – latest 5d window"
 
 
+def _expand_retrieval_query(query: str) -> str:
+    """Add filing terminology that often appears in tables/10-K text.
+
+    The expansion is intentionally conservative: it does not add facts, only
+    common synonymous labels for the concept already present in the question.
+    """
+    lowered = query.lower()
+    additions: list[str] = []
+
+    if "cash flow from operations" in lowered or "operating cash flow" in lowered:
+        additions.extend([
+            "net cash provided by operating activities",
+            "net cash from operating activities",
+        ])
+
+    if "debt" in lowered:
+        additions.extend([
+            "total debt",
+            "long-term debt",
+            "current portion of long-term debt",
+            "short-term debt",
+            "borrowings",
+        ])
+
+    if "capital expenditure" in lowered or "capital expenditures" in lowered or "capex" in lowered:
+        additions.extend([
+            "capital expenditures",
+            "capital and exploration expenditures",
+            "additions to property plant and equipment",
+            "property plant and equipment additions",
+        ])
+
+    if "total revenue" in lowered:
+        additions.extend([
+            "total revenue",
+            "net revenue",
+            "total revenues",
+            "consolidated revenue",
+        ])
+
+    if "revenue" in lowered and any(term in lowered for term in ("growth", "driver", "trend")):
+        additions.extend([
+            "revenue increased",
+            "revenue decreased",
+            "revenue growth",
+            "driven by",
+        ])
+
+    if "gross margin" in lowered:
+        additions.extend([
+            "gross margin increased",
+            "gross margin decreased",
+            "cost of revenue",
+        ])
+
+    if "reportable segment" in lowered or "business segment" in lowered:
+        additions.extend([
+            "reportable segments",
+            "operating segments",
+            "business segments",
+        ])
+
+    if not additions:
+        return query
+
+    # Preserve order while removing duplicates.
+    unique_additions = list(dict.fromkeys(additions))
+    return f"{query} {' '.join(unique_additions)}"
+
+
+def _merge_documents(primary: list, secondary: list, limit: int) -> list:
+    """Interleave two ranked result lists while removing duplicate chunks."""
+    merged = []
+    seen: set[str] = set()
+
+    max_len = max(len(primary), len(secondary))
+    for i in range(max_len):
+        for docs in (primary, secondary):
+            if i >= len(docs):
+                continue
+            doc = docs[i]
+            key = getattr(doc, "page_content", "")
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(doc)
+            if len(merged) >= limit:
+                return merged
+
+    return merged
+
+
+def _search_with_query_expansion(vectorstore, query: str, k: int, filter_dict: dict) -> list:
+    primary = vectorstore.similarity_search(query, k=k, filter=filter_dict)
+
+    expanded_query = _expand_retrieval_query(query)
+    if expanded_query == query:
+        return primary
+
+    expanded = vectorstore.similarity_search(
+        expanded_query,
+        k=k,
+        filter=filter_dict,
+    )
+    return _merge_documents(primary, expanded, limit=k)
+
+
 def get_stock_performance(ticker: str) -> dict:
     """
     Fetch latest 5-day price/volume data for a ticker.
@@ -178,7 +286,7 @@ def query_financial_reports(
     company: str,
     fiscal_year: Optional[int] = None,
     section: Optional[str] = None,
-    k: int = 4,
+    k: int = 8,
 ) -> dict:
     """
     Search local 10-K filings for a specific company.
@@ -198,7 +306,36 @@ def query_financial_reports(
     filter_dict = conditions[0] if len(conditions) == 1 else {"$and": conditions}
 
     try:
-        docs = get_vectorstore().similarity_search(query, k=k, filter=filter_dict)
+        vectorstore = get_vectorstore()
+        docs = hybrid_retrieve(
+            vectorstore,
+            query=query,
+            k=k,
+            filter_dict=filter_dict,
+            prefer_latest_year=(fiscal_year is None),
+            financial_statement_mode=(section_slug == "financial_statements"),
+        )
+
+        # A section classifier can be correct while a section-filtered semantic
+        # search still returns nothing because the indexed chunk metadata is
+        # incomplete. Retry at company level before declaring the evidence
+        # unavailable. Query expansion is also used on this fallback.
+        if not docs and section_slug is not None:
+            logger.info(
+                "section_retrieval_fallback",
+                extra={
+                    "company_slug": company_slug,
+                    "section_slug": section_slug,
+                },
+            )
+            docs = hybrid_retrieve(
+                vectorstore,
+                query=query,
+                k=k,
+                filter_dict={"company_slug": company_slug},
+                prefer_latest_year=(fiscal_year is None),
+                financial_statement_mode=(section_slug == "financial_statements"),
+            )
     except VectorStoreUnavailableError:
         raise
     except Exception as exc:
