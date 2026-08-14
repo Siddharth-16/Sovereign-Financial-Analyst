@@ -219,10 +219,9 @@ def split_by_anchors(html: str) -> dict[str, str] | None:
 # discarding almost the entire section).
 #
 # Instead: for each candidate heading line, score it by how much text
-# follows before hitting ANY other candidate heading line (from any
-# section). The real section start is always the one with by far the
-# largest run of content after it; TOC/cross-reference/running-header
-# mentions are followed almost immediately by another heading-like line.
+# follows before hitting a candidate heading for a DIFFERENT section. This
+# lets repeated running headers for the same section coexist without
+# artificially shortening the candidate's content run.
 
 def _find_candidates(lines: list[str], patterns: dict[str, re.Pattern]) -> dict[str, list[int]]:
     candidates: dict[str, list[int]] = {s: [] for s in patterns}
@@ -242,11 +241,28 @@ def split_by_regex(text: str) -> dict[str, str]:
     lines = text.split("\n")
 
     candidates = _find_candidates(lines, SECTION_PATTERNS_ITEM)
-    missing = [s for s in SECTION_PATTERNS_ITEM if s not in candidates]
-    if missing:
-        narrative_patterns = {s: SECTION_PATTERNS_NARRATIVE[s] for s in missing}
+
+    # Some filers (notably JPMorgan Chase and ExxonMobil) make Item 7/8 in
+    # Part II only a short cross-reference and place the real MD&A / financial
+    # statements later in a separate financial section. In those filings the
+    # Item heading exists, so a "narrative only when Item is missing" fallback
+    # never sees the real section heading. Always supplement MD&A and financial
+    # statements with narrative candidates; keep the old missing-only behavior
+    # for Business/Risk Factors to avoid broad narrative false positives.
+    narrative_sections = [
+        section
+        for section in SECTION_PATTERNS_NARRATIVE
+        if section not in candidates or section in {"mdna", "financial_statements"}
+    ]
+    if narrative_sections:
+        narrative_patterns = {
+            section: SECTION_PATTERNS_NARRATIVE[section]
+            for section in narrative_sections
+        }
         narrative_candidates = _find_candidates(lines, narrative_patterns)
-        candidates.update(narrative_candidates)
+        for section, idxs in narrative_candidates.items():
+            candidates.setdefault(section, []).extend(idxs)
+            candidates[section] = sorted(set(candidates[section]))
 
     if not candidates:
         return {"full_filing": text}
@@ -259,9 +275,9 @@ def split_by_regex(text: str) -> dict[str, str]:
         (idx, section) for section, idxs in candidates.items() for idx in idxs
     )
 
-    def next_boundary_after(idx: int) -> int:
-        for other_idx, _ in all_positions:
-            if other_idx > idx:
+    def next_boundary_after(idx: int, section: str) -> int:
+        for other_idx, other_section in all_positions:
+            if other_idx > idx and other_section != section:
                 return other_idx
         return len(lines)
 
@@ -269,7 +285,7 @@ def split_by_regex(text: str) -> dict[str, str]:
     for section, idxs in candidates.items():
         scored = []
         for idx in idxs:
-            end_idx = next_boundary_after(idx)
+            end_idx = next_boundary_after(idx, section)
             char_len = line_char_offsets[end_idx] - line_char_offsets[idx]
             scored.append((char_len, idx))
         scored.sort(reverse=True)  # largest content run (by characters) wins
