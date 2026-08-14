@@ -55,7 +55,10 @@ def find_company_aliases(text: str) -> list[str]:
     found = []
 
     for alias, company_slug in COMPANY_ALIASES.items():
-        pattern = rf"\b{re.escape(alias)}\b"
+        # Company names in natural language frequently appear in possessive
+        # form (e.g. "Microsoft's"). Match the alias itself rather than
+        # requiring punctuation after it.
+        pattern = rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])"
         if re.search(pattern, lowered) and company_slug not in found:
             found.append(company_slug)
 
@@ -149,19 +152,42 @@ def validate(
 def infer_needs(user_input: str) -> tuple[bool, bool]:
     lowered = user_input.lower()
 
-    filing_keywords = {
-        "10-k", "risk", "risks", "revenue", "r&d", "net income",
-        "business", "segment", "segments", "filing", "strategy",
-        "risk factors", "revenue trend", "summarize", "compare"
-    }
+    # If we can identify a filing section, the query requires filing retrieval.
+    # Also support general filing questions that may not map to one section.
+    needs_filings = (
+        infer_section(user_input) is not None
+        or any(
+            phrase in lowered
+            for phrase in {
+                "10-k",
+                "10-k filing",
+                "annual report",
+                "filing",
+                "summarize",
+            }
+        )
+    )
 
-    stock_keywords = {
-        "stock", "price", "performing", "performance", "trading",
-        "market", "high", "low", "volume"
-    }
+    # Stock intent should use explicit words/phrases rather than substring
+    # matching ("low" previously matched "flow").
+    stock_patterns = [
+        r"\bstock\b",
+        r"\bshare price\b",
+        r"\bstock price\b",
+        r"\btrading\b",
+        r"\btrading price\b",
+        r"\bvolume\b",
+        r"\bstock performance\b",
+        r"\bshare performance\b",
+        r"\b52[- ]week high\b",
+        r"\b52[- ]week low\b",
+        r"\bprice performance\b",
+    ]
 
-    needs_filings = any(k in lowered for k in filing_keywords)
-    needs_stock = any(k in lowered for k in stock_keywords)
+    needs_stock = any(
+        re.search(pattern, lowered)
+        for pattern in stock_patterns
+    )
 
     return needs_filings, needs_stock
 
@@ -199,7 +225,8 @@ def infer_section(user_input: str) -> Optional[str]:
 
     financial_keywords = {
         "balance sheet", "income statement", "financial statements",
-        "financials", "assets", "liabilities"
+        "financials", "assets", "liabilities", "debt", "debt levels",
+        "total debt", "cash flow from operations", "capital expenditures",
     }
 
     mdna_keywords = {
@@ -434,8 +461,31 @@ def ask_agent(
 
     if needs_stock:
         ticker = SLUG_TO_TICKER.get(active_company)
+
         if ticker:
             stock_result = get_stock_performance(ticker)
+
+            # Stock-only questions do not need LLM synthesis or filing context.
+            if needs_stock and not needs_filings:
+                if stock_result.get("error"):
+                    return stock_result["error"], active_company
+
+                data = stock_result["data"]
+                citation = stock_result.get("citation")
+
+                reply = (
+                    f"**{ticker} stock performance**\n\n"
+                    f"- Latest available price: **\\${data['latest_price']:.2f}**\n"
+                    f"- Latest session range: "
+                    f"**\\${data['low']:.2f} – \\${data['high']:.2f}**\n"
+                    f"- Volume: **{data['volume']:,} shares**"
+                )
+
+                if citation:
+                    reply += f"\n\nSources:\n• {citation}"
+
+                return reply, active_company
+
             stock_context = stock_result.get("data")
             stock_citation = stock_result.get("citation")
     
@@ -446,12 +496,24 @@ def ask_agent(
         company_slug=active_company,
         filing_context=filing_context,
         filing_citations=filing_citations,
-        stock_context=stock_context,
-        stock_citation=stock_citation,
+        stock_context=None,
+        stock_citation=None,
     )
     logger.info(
         "llm_synthesis_timing",
         extra={"llm_ms": round((_time.perf_counter() - _llm_start) * 1000, 1)},
     )
+
+    if needs_stock and needs_filings and stock_context:
+        reply += (
+            f"\n\n**{ticker} stock performance**\n\n"
+            f"- Latest available price: **\\${stock_context['latest_price']:.2f}**\n"
+            f"- Latest session range: "
+            f"**\\${stock_context['low']:.2f} – \\${stock_context['high']:.2f}**\n"
+            f"- Volume: **{stock_context['volume']:,} shares**"
+        )
+
+        if stock_citation:
+            reply += f"\n\n**Market data source:** {stock_citation}"
 
     return reply, active_company
