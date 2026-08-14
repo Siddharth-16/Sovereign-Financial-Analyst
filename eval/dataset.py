@@ -15,7 +15,7 @@ be frozen before application optimization.
 """
 
 DATASET_NAME = "sovereign-financial-analyst-regression"
-DATASET_VERSION = "dev-v4-year-robust-gold-2026-08-13"
+DATASET_VERSION = "dev-v5-tesla-2025-gold-2026-08-14"
 DATASET_SPLIT = "dev"
 
 EVAL_QUESTIONS = [{'id': 'biz-01',
@@ -117,69 +117,99 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                       'patterns': [],
                       'regex_patterns': ['(?:GeForce|RTX|GPU).*(?:Data Center|AI|network)|(?:Data '
                                          'Center|AI|network).*(?:GeForce|RTX|GPU)']}]},
- {'id': 'biz-02',
-  'question': "What is Tesla's business model and what are its primary product lines?",
-  'expected_company': 'tesla',
-  'expected_section': 'business',
-  'category': 'business',
-  'answerable': True,
-  'gold_fiscal_year': 2024,
-  'gold_evidence': [{'id': 'primary-product-categories',
-                     'text': 'ITEM 1. BUSINESS Overview We design, develop, manufacture, sell and lease '
-                             'high-performance fully electric vehicles and energy generation and storage '
-                             'systems, and offer services related to our products.',
-                     'alternatives': ['ITEM 1. BUSINESS Overview We design, develop, manufacture, sell and '
-                                      'lease high-performance fully electric vehicles and energy generation '
-                                      'and storage systems, and offer services related to our products.'],
-                     'source_path': 'data/raw/tesla/2024_10k.html',
-                     'source_fiscal_year': 2024},
-                    {'id': 'business-model',
-                     'text': 'We generally sell our products directly to customers, and continue to grow our '
-                             'customer-facing infrastructure through a global network of vehicle showrooms '
-                             'and service centers, Mobile Service, body shops, Supercharger stations and '
-                             'Destination Chargers to accelerate the widespread adoption of our products. We '
-                             'emphasize performance, attractive styling and the safety of our users and '
-                             'workforce in the design and manufacture of our products and are continuing to '
-                             'develop full self-driving technology for improved safety. We also strive to '
-                             'lower the cost of ownership for our customers through continuous efforts to '
-                             'reduce manufacturing costs and by offering financial and other services '
-                             'tailored to our products. Our mission is to accelerate the world’s transition '
-                             'to sustainable energy. We believe that this mission, along with our '
-                             'engineering expertise, vertically integrated business model and focus on user '
-                             'experience differentiate us from other companies.',
-                     'alternatives': ['We generally sell our products directly to customers, and continue to '
-                                      'grow our customer-facing infrastructure through a global network of '
-                                      'vehicle service centers, Mobile Service, body shops, Supercharger '
-                                      'stations and Destination Chargers to accelerate the widespread '
-                                      'adoption of our products. We emphasize performance, attractive '
-                                      'styling and the safety of our users and workforce in the design and '
-                                      'manufacture of our products and are continuing to develop full '
-                                      'self-driving technology for improved safety. We also strive to lower '
-                                      'the cost of ownership for our customers through continuous efforts to '
-                                      'reduce manufacturing costs and by offering financial and other '
-                                      'services tailored to our products. Our mission is to accelerate the '
-                                      'world’s transition to sustainable energy. We believe that this '
-                                      'mission, along with our engineering expertise, vertically integrated '
-                                      'business model and focus on user experience differentiate us from '
-                                      'other companies.'],
-                     'source_path': 'data/raw/tesla/2024_10k.html',
-                     'source_fiscal_year': 2024}],
-  'expected_facts': [{'id': 'electric-vehicles',
-                      'description': 'Primary products include fully electric vehicles',
-                      'patterns': ['fully electric vehicles'],
-                      'regex_patterns': ['(?:fully\\s+)?electric\\s+vehicles?']},
-                     {'id': 'energy-products',
-                      'description': 'Primary products include energy generation and storage systems',
-                      'patterns': ['energy generation and storage systems'],
-                      'regex_patterns': ['energy\\s+generation\\s+and\\s+storage(?:\\s+systems)?']},
-                     {'id': 'business-model',
-                      'description': 'Business model includes direct customer sales and/or vertical '
-                                     'integration',
-                      'patterns': ['vertically integrated business model'],
-                      'regex_patterns': ['sell\\w*\\s+(?:our\\s+)?products\\s+directly\\s+to\\s+customers|vertically\\s+integrated\\s+business\\s+model']}],
-  'annotation_note': 'Gold targets the question as written: Tesla business model and primary product '
-                     'categories. It does not require the answer to enumerate every vehicle model or frame '
-                     'the response as reportable segments.'},
+ {
+    "id": "biz-02",
+    "question": "What is Tesla's business model and what are its primary product lines?",
+    "expected_company": "tesla",
+    "expected_section": "business",
+    "category": "business",
+    "answerable": True,
+    "gold_fiscal_year": 2025,
+
+    "gold_evidence": [
+        {
+            "id": "primary-product-categories",
+            "text": (
+                "We operate as two reportable segments: (i) automotive and "
+                "(ii) energy generation and storage. The automotive segment "
+                "includes the design, development, manufacturing, sales and "
+                "leasing of high-performance fully electric vehicles as well "
+                "as sales of automotive regulatory credits. Additionally, the "
+                "automotive segment also includes services and other, which "
+                "includes sales of used vehicles, non-warranty maintenance "
+                "services and collision, paid Supercharging sessions, "
+                "automotive insurance business revenue, part sales and retail "
+                "merchandise sales. The energy generation and storage segment "
+                "includes sales, leasing, and financing of energy generation "
+                "and storage products, services related to such products and "
+                "sales of energy generation incentives."
+            ),
+            "alternatives": [
+                (
+                    "ITEM 1. BUSINESS Overview We design, develop, manufacture, "
+                    "sell and lease high-performance fully electric vehicles "
+                    "and energy generation and storage systems, and offer "
+                    "services related to our products."
+                )
+            ],
+            "source_path": "data/raw/tesla/2025_10k.html",
+            "source_fiscal_year": 2025,
+        },
+        {
+            "id": "business-model",
+            "text": (
+                "We believe that this mission, along with our engineering "
+                "expertise, advancements in real-world AI, vertically "
+                "integrated business model, and focus on user experience "
+                "differentiate us from other companies."
+            ),
+            "alternatives": [
+                (
+                    "We believe that this mission, along with our engineering "
+                    "expertise, vertically integrated business model and focus "
+                    "on user experience differentiate us from other companies."
+                )
+            ],
+            "source_path": "data/raw/tesla/2025_10k.html",
+            "source_fiscal_year": 2025,
+        },
+    ],
+
+    "expected_facts": [
+        {
+            "id": "electric-vehicles",
+            "description": "Primary products include fully electric vehicles",
+            "patterns": ["fully electric vehicles"],
+            "regex_patterns": [
+                r"(?:fully\s+)?electric\s+vehicles?"
+            ],
+        },
+        {
+            "id": "energy-products",
+            "description": (
+                "Primary products include energy generation and storage products"
+            ),
+            "patterns": ["energy generation and storage"],
+            "regex_patterns": [
+                r"energy\s+generation\s+and\s+storage(?:\s+(?:systems|products))?"
+            ],
+        },
+        {
+            "id": "business-model",
+            "description": "Business model includes vertical integration",
+            "patterns": ["vertically integrated business model"],
+            "regex_patterns": [
+                r"vertically\s+integrated\s+business\s+model"
+            ],
+        },
+    ],
+
+    "annotation_note": (
+        "Gold now targets Tesla's FY2025 10-K because unspecified-year "
+        "application queries resolve to the latest indexed filing. FY2024 "
+        "passages are retained only where they express the same underlying fact."
+    ),
+},
  {'id': 'biz-03',
   'question': "What are JPMorgan Chase's main reportable business segments?",
   'expected_company': 'jpmorgan_chase',
@@ -700,54 +730,90 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                                      'position/demand/margins',
                       'patterns': [],
                       'regex_patterns': ['(?:regulat\\w+|laws?).*(?:reputation|competitive|demand|sales|margin)|(?:reputation|competitive|demand|sales|margin).*(?:regulat\\w+|laws?)']}]},
- {'id': 'risk-03',
-  'question': 'What manufacturing and production risks does Tesla discuss?',
-  'expected_company': 'tesla',
-  'expected_section': 'risk_factors',
-  'category': 'risk_factors',
-  'answerable': True,
-  'gold_fiscal_year': 2024,
-  'gold_evidence': [{'id': 'production-ramp',
-                     'text': 'Any delay or other complication in ramping the production of our current '
-                             'products or the development, manufacture, launch and production ramp of our '
-                             'future products, features and services, or in doing so cost-effectively and '
-                             'with high quality, may harm our brand, business, prospects, financial '
-                             'condition and operating results.',
-                     'content_fingerprint': '491bf021eebe016e35d5',
-                     'source_path': 'data/raw/tesla/2024_10k.html',
-                     'source_fiscal_year': 2024,
-                     'alternatives': ['We have experienced, and may also experience similar future delays in '
-                                      'launching and/or ramping production of our energy storage products '
-                                      'and Solar Roof; new product versions or variants; new vehicles; and '
-                                      'future features and services based on artificial intelligence. '
-                                      'Likewise, we may encounter delays with the design, construction and '
-                                      'regulatory or other approvals necessary to build and bring online '
-                                      'future manufacturing facilities and products. Any delay or other '
-                                      'complication in ramping the production of our current products or the '
-                                      'development, manufacture, launch and production ramp of our future '
-                                      'products, features and services, or in doing so cost-effectively and '
-                                      'with high quality, may harm our brand, business, prospects, financial '
-                                      'condition and operating results. Our suppliers may fail to deliver '
-                                      'components according to schedules, prices, quality and volumes that '
-                                      'are acceptable to us, or we may be unable to manage these components '
-                                      'effectively.']},
-                    {'id': 'component-supplier',
-                     'text': 'The unavailability of any component or supplier could result in production '
-                             'delays, idle manufacturing facilities, product design changes and loss of '
-                             'access to important technology and tools for producing and supporting our '
-                             'products, as well as impact our capacity expansion and our ability to fulfill '
-                             'our obligations under customer contracts.',
-                     'content_fingerprint': '941f3b14e756a23d3a63',
-                     'source_path': 'data/raw/tesla/2024_10k.html',
-                     'source_fiscal_year': 2024}],
-  'expected_facts': [{'id': 'ramp-delays',
-                      'description': 'Production ramp delays/complications can harm results',
-                      'patterns': [],
-                      'regex_patterns': ['(?:production|manufacturing)\\s+ramp.*(?:delay|complication|risk)|(?:delay|complication).*(?:production|manufacturing)\\s+ramp']},
-                     {'id': 'supplier-unavailability',
-                      'description': 'Component/supplier unavailability can cause production delays',
-                      'patterns': [],
-                      'regex_patterns': ['(?:component|supplier).*(?:unavail\\w+|fail\\w+).*(?:production\\s+delays?|idle\\s+manufacturing)|production\\s+delays?.*(?:component|supplier)']}]},
+ {
+    "id": "risk-03",
+    "question": "What manufacturing and production risks does Tesla discuss?",
+    "expected_company": "tesla",
+    "expected_section": "risk_factors",
+    "category": "risk_factors",
+    "answerable": True,
+    "gold_fiscal_year": 2025,
+
+    "gold_evidence": [
+        {
+            "id": "production-ramp",
+            "text": (
+                "We may experience issues or delays in developing, launching "
+                "and ramping the production of our products, services and "
+                "features, or we may be unable to control our manufacturing costs."
+            ),
+            "alternatives": [
+                (
+                    "Any delay or other complication in ramping the production "
+                    "of our current products or the development, manufacture, "
+                    "launch and production ramp of our future products, features "
+                    "and services, or in doing so cost-effectively and with high "
+                    "quality, may harm our brand, business, prospects, financial "
+                    "condition and operating results."
+                )
+            ],
+            "source_path": "data/raw/tesla/2025_10k.html",
+            "source_fiscal_year": 2025,
+        },
+        {
+            "id": "gigafactory-components",
+            "text": (
+                "We may experience issues with lithium-ion cells or other "
+                "components manufactured at our Gigafactories, which may harm "
+                "the production and profitability of our vehicle and energy "
+                "storage products."
+            ),
+            "source_path": "data/raw/tesla/2025_10k.html",
+            "source_fiscal_year": 2025,
+        },
+    ],
+
+    "expected_facts": [
+        {
+            "id": "ramp-delays",
+            "description": (
+                "Developing, launching, or ramping production can face delays"
+            ),
+            "patterns": [],
+            "regex_patterns": [
+                (
+                    r"(?:issues|delays?).*"
+                    r"(?:ramp(?:ing)?(?:\s+up)?\s+(?:the\s+)?production)"
+                    r"|"
+                    r"(?:ramp(?:ing)?(?:\s+up)?\s+(?:the\s+)?production).*"
+                    r"(?:issues|delays?)"
+                )
+            ],
+        },
+        {
+            "id": "gigafactory-components",
+            "description": (
+                "Lithium-ion cell/component issues at Gigafactories can harm "
+                "production or profitability"
+            ),
+            "patterns": [],
+            "regex_patterns": [
+                (
+                    r"(?:lithium[-\s]?ion|components?).*"
+                    r"(?:Gigafactor(?:y|ies)|production|profitability)"
+                    r"|"
+                    r"(?:Gigafactor(?:y|ies)).*"
+                    r"(?:lithium[-\s]?ion|components?|production|profitability)"
+                )
+            ],
+        },
+    ],
+
+    "annotation_note": (
+        "FY2025 replaces the prior FY2024 supplier-unavailability label with "
+        "Tesla's current Gigafactory cell/component manufacturing-risk disclosure."
+    ),
+},
  {'id': 'risk-04',
   'question': 'What environmental and regulatory risks does ExxonMobil disclose?',
   'expected_company': 'exxonmobil',
