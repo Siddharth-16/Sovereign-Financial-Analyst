@@ -160,25 +160,23 @@ For prose-heavy sections like Business, Risk Factors, and MD&A, the system build
 
 ## Evaluation
 
-The system is evaluated on a **28-question development/regression benchmark** spanning Business, Risk Factors, MD&A, and Financial Statements. The benchmark contains **46 gold evidence items** and **71 expected answer facts**.
+The system is evaluated on a **28-question development/regression benchmark** spanning Business, Risk Factors, MD&A, and Financial Statements. The benchmark contains **46 gold evidence items** and **79 expected answer facts**.
 
 | Metric                      |    Rule-Based |       Agentic |
 | --------------------------- | ------------: | ------------: |
 | Company routing accuracy    |        100.0% |        100.0% |
 | Section routing accuracy    |        100.0% |        100.0% |
 | Metadata retrieval hit rate |        100.0% |        100.0% |
-| Evidence retrieval recall@8 | 60.9% (28/46) | 71.7% (33/46) |
-| Answer fact completeness    | 45.1% (32/71) | 81.7% (58/71) |
-| Manual answer groundedness  | 64.3% (18/28) | 78.6% (22/28) |
-| Tool errors                 |           N/A |             0 |
+| Evidence retrieval recall@8 | 63.0% (29/46) | 69.6% (32/46) |
+| Answer fact completeness    | 49.3% (35/71) | 83.1% (59/71) |
+| Manual answer groundedness  | 71.4% (20/28) | 71.4% (20/28) |
+| Tool errors                 |             0 |             0 |
 
-The agentic pipeline improves evidence recall, answer completeness, and manual groundedness relative to the rule-based baseline. The rule-based path remains useful as a deterministic baseline and is faster in end-to-end runs.
+The agentic pipeline substantially improves answer completeness while holding groundedness steady. The rule-based path is still useful as a deterministic baseline, and it's faster in end-to-end runs.
 
 Groundedness was manually evaluated against the exact retrieved `generation_context` saved for each answer. Missing expected facts reduce completeness, but they don't count as hallucinations unless the answer actually states an unsupported claim.
 
 The benchmark was used during development and regression testing, so these results shouldn't be read as held-out test performance.
-
-Regression testing was also used to reject changes that improved one metric while degrading overall behavior. Diversity-oriented reranking, ordered-neighbor retrieval, and stricter synthesis constraints were all tried and dropped after they reduced answer completeness or introduced new response-quality failures.
 
 See [`eval/comparison.md`](eval/comparison.md) for the compact rule-based vs. agentic comparison and the final JSON artifacts for per-question details.
 
