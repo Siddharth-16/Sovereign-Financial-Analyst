@@ -168,13 +168,10 @@ The system is evaluated on a **28-question development/regression benchmark** sp
 | Section routing accuracy    |        100.0% |        100.0% |
 | Metadata retrieval hit rate |        100.0% |        100.0% |
 | Evidence retrieval recall@8 | 63.0% (29/46) | 69.6% (32/46) |
-| Answer fact completeness    | 49.3% (35/71) | 83.1% (59/71) |
-| Manual answer groundedness  | 71.4% (20/28) | 71.4% (20/28) |
-| Tool errors                 |             0 |             0 |
+| Answer fact completeness    | 43.0% (34/79) | 75.9% (60/71) |
+| Tool errors                 |           N/A |             0 |
 
-The agentic pipeline substantially improves answer completeness while holding groundedness steady. The rule-based path is still useful as a deterministic baseline, and it's faster in end-to-end runs.
-
-Groundedness was manually evaluated against the exact retrieved `generation_context` saved for each answer. Missing expected facts reduce completeness, but they don't count as hallucinations unless the answer actually states an unsupported claim.
+The agentic pipeline substantially improves answer completeness. The rule-based path is still useful as a deterministic baseline, and it's faster in end-to-end runs.
 
 The benchmark was used during development and regression testing, so these results shouldn't be read as held-out test performance.
 
@@ -370,6 +367,7 @@ Sovereign-Financial-Analyst/
 ├── scripts/
 │   ├── data.py
 │   ├── ingest.py
+|   ├── sync_chroma.py
 │   └── check_coverage.py
 │
 ├── .github/workflows/
@@ -386,7 +384,7 @@ Sovereign-Financial-Analyst/
 ## Known limitations
 
 - The 28-question benchmark is a **development/regression set**, not a held-out test set. Results may overestimate generalization to a completely unseen question distribution.
-- Agentic evidence recall is **71.7%**, so retrieval still misses some required evidence even when company/section routing is correct.
+- Agentic evidence recall is **69.6%**, so retrieval still misses some required evidence even when company/section routing is correct.
 - The local `llama3.2:3b` model keeps the project laptop-friendly, but it can still produce incomplete or unsupported prose. The evaluation framework is built to surface those failures rather than hide them.
 - SEC filings vary a lot in HTML/table structure, so ingestion quality depends on how cleanly a filing can be sectioned and parsed.
 - Live stock queries depend on `yfinance` availability and reflect the latest data that provider returns, not an exchange-grade real-time feed.
