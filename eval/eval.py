@@ -167,13 +167,15 @@ def _judge_metadata(app: dict[str, Any]) -> dict[str, str]:
     """
     app_config = app["app_config"]
     provider = os.getenv("JUDGE_LLM_PROVIDER", app_config.LLM_PROVIDER).strip().lower()
-    if provider not in {"groq", "ollama"}:
+    if provider not in {"groq", "ollama", "anthropic"}:
         raise ValueError(
-            f"Unknown JUDGE_LLM_PROVIDER={provider!r}. Expected 'groq' or 'ollama'."
+            f"Unknown JUDGE_LLM_PROVIDER={provider!r}. Expected 'groq', 'ollama', or 'anthropic'."
         )
 
     if provider == "groq":
         model = os.getenv("JUDGE_GROQ_MODEL", app_config.GROQ_MODEL)
+    elif provider == "anthropic":
+        model = os.getenv("JUDGE_ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
     else:
         model = os.getenv("JUDGE_OLLAMA_MODEL", app_config.OLLAMA_MODEL)
     return {
@@ -201,6 +203,9 @@ class _JudgeClient:
         if self.provider == "groq":
             from langchain_groq import ChatGroq
             self.llm = ChatGroq(model=self.model, temperature=0)
+        elif self.provider == "anthropic":
+            from langchain_anthropic import ChatAnthropic
+            self.llm = ChatAnthropic(model=self.model, temperature=0)
 
     def invoke_text(self, messages: list[dict[str, str]]) -> str:
         if self.provider == "ollama":
@@ -864,6 +869,7 @@ def parse_args() -> argparse.Namespace:
             "reject a different value rather than silently changing retrieval for the benchmark."
         ),
     )
+    parser.add_argument("--id", help="Evaluate one question by ID")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--markdown", type=Path)
     return parser.parse_args()
@@ -875,6 +881,8 @@ def main() -> int:
         raise SystemExit("--runs must be >= 1")
 
     questions, dataset_meta = _load_dataset(args.dataset_module)
+    if args.id:
+        questions = [q for q in questions if q.get("id") == args.id]
     if args.category:
         questions = [q for q in questions if q.get("category") == args.category]
     if args.limit is not None:

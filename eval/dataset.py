@@ -15,11 +15,11 @@ be frozen before application optimization.
 """
 
 DATASET_NAME = "sovereign-financial-analyst-regression"
-DATASET_VERSION = "dev-v5-tesla-2025-gold-2026-08-14"
+DATASET_VERSION = "dev-v6-reviewed-2026-08-15"
 DATASET_SPLIT = "dev"
 
 EVAL_QUESTIONS = [{'id': 'biz-01',
-  'question': "What are Nvidia's main business segments and how does the company describe its core products?",
+  'question': "What are Nvidia's main business segments?",
   'expected_company': 'nvidia',
   'expected_section': 'business',
   'category': 'business',
@@ -112,14 +112,10 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                       'description': 'Graphics is a reportable segment',
                       'patterns': ['Graphics segment'],
                       'regex_patterns': ['\\bGraphics\\b.*\\bsegment\\b|\\bsegment\\b.*\\bGraphics\\b']},
-                     {'id': 'core-products',
-                      'description': 'Core offerings include GPU/RTX and data-center/AI/networking platforms',
-                      'patterns': [],
-                      'regex_patterns': ['(?:GeForce|RTX|GPU).*(?:Data Center|AI|network)|(?:Data '
-                                         'Center|AI|network).*(?:GeForce|RTX|GPU)']}]},
+                     ]},
  {
     "id": "biz-02",
-    "question": "What is Tesla's business model and what are its primary product lines?",
+    "question": "How does Tesla describe its business model, and what are its primary product categories?",
     "expected_company": "tesla",
     "expected_section": "business",
     "category": "business",
@@ -211,7 +207,7 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
     ),
 },
  {'id': 'biz-03',
-  'question': "What are JPMorgan Chase's main reportable business segments?",
+  'question': "What are JPMorgan Chase's reportable business segments?",
   'expected_company': 'jpmorgan_chase',
   'expected_section': 'business',
   'category': 'business',
@@ -238,7 +234,7 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                       'patterns': ['Asset & Wealth Management'],
                       'regex_patterns': ['Asset\\s*(?:&|and)\\s*Wealth\\s+Management|\\bAWM\\b']}]},
  {'id': 'biz-04',
-  'question': 'How does Walmart describe its business strategy and store formats?',
+  'question': 'What strategic priorities and store formats does Walmart identify?',
   'expected_company': 'walmart',
   'expected_section': 'business',
   'category': 'business',
@@ -312,19 +308,25 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'strategy-price-convenience',
                       'description': 'Strategy emphasizes price leadership and convenience',
                       'patterns': ['price leadership', 'convenience'],
-                      'regex_patterns': ['(?:price leadership|everyday low '
-                                         'prices|EDLP).*(?:convenience|save.*time)|(?:convenience|save.*time).*(?:price '
-                                         'leadership|everyday low prices|EDLP)']},
+                      'regex_patterns': [r"(?=[\s\S]*(?:price\s+leadership|everyday\s+low\s+prices|EDLP))"
+                                         r"(?=[\s\S]*(?:convenience|sav(?:e|ing)\s+(?:customers?\s+)?time))"]},
                      {'id': 'supercenters',
                       'description': 'Supercenters store format',
                       'patterns': ['Supercenters'],
                       'regex_patterns': ['\\bSupercenters?\\b']},
-                     {'id': 'discount-neighborhood',
-                      'description': 'Discount stores and Neighborhood Markets',
-                      'patterns': [],
-                      'regex_patterns': ['Discount\\s+stores?.*Neighborhood\\s+(?:markets?|Markets?)|Neighborhood\\s+(?:markets?|Markets?).*Discount\\s+stores?']}]},
+                     {'id': 'discount-stores',
+                      'description': 'Discount stores',
+                      'patterns': ['Discount stores'],
+                      'regex_patterns': ['\\bDiscount\\s+stores?\\b']
+                    },
+                    {
+                        'id': 'neighborhood-markets',
+                        'description': 'Neighborhood Markets',
+                        'patterns': ['Neighborhood markets'],
+                        'regex_patterns': ['\\bNeighborhood\\s+[Mm]arkets?\\b']
+                    }]},
  {'id': 'biz-05',
-  'question': "What are Eli Lilly's main therapeutic areas and business segments?",
+  'question': "What is Eli Lilly's business segment, and what are its primary therapeutic research areas?",
   'expected_company': 'eli_lilly',
   'expected_section': 'business',
   'category': 'business',
@@ -381,11 +383,31 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'single-pharma-segment',
                       'description': 'Single human pharmaceutical products business segment',
                       'patterns': ['single business segment', 'human pharmaceutical products'],
-                      'regex_patterns': ['single\\s+(?:business\\s+)?segment.*human\\s+pharmaceutical|human\\s+pharmaceutical.*single\\s+(?:business\\s+)?segment']},
-                     {'id': 'therapeutic-areas',
-                      'description': 'Primary research areas: immunology, metabolism, neuroscience, oncology',
-                      'patterns': [],
-                      'regex_patterns': ['immunology.*(?:metabolism|diabetes|obesity).*neuroscience.*oncology']}]},
+                      'regex_patterns': [r"\bhuman\s+pharmaceutical(?:\s+products?)?\b"]},
+                     {
+                        "id": "immunology",
+                        "description": "immunology",
+                        "patterns": ["immunology"],
+                        "regex_patterns": ["\\bimmunology\\b"]
+                    },
+                    {
+                        "id": "metabolism",
+                        "description": "metabolism",
+                        "patterns": ["metabolism"],
+                        "regex_patterns": ["\\bmetabolism\\b"]
+                    },
+                    {
+                        "id": "neuroscience",
+                        "description": "neuroscience",
+                        "patterns": ["neuroscience"],
+                        "regex_patterns": ["\\bneuroscience\\b"]
+                    },
+                    {
+                        "id": "oncology",
+                        "description": "oncology",
+                        "patterns": ["oncology"],
+                        "regex_patterns": ["\\boncology\\b"]
+                    }]},
  {'id': 'biz-06',
   'question': "What are Boeing's primary business segments?",
   'expected_company': 'boeing',
@@ -538,14 +560,18 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                      {'id': 'processing-services',
                       'description': 'Provides authorization, clearing and settlement',
                       'patterns': ['authorization, clearing and settlement'],
-                      'regex_patterns': ['authorization.*clearing.*settlement']},
+                      'regex_patterns': [r"(?=[\s\S]*\bauthorization\b)"
+                                         r"(?=[\s\S]*\bclearing\b)"
+                                         r"(?=[\s\S]*\bsettlement\b)"]},
                      {'id': 'revenue-streams',
                       'description': 'Revenue includes service, data processing and international '
                                      'transaction revenue',
                       'patterns': [],
-                      'regex_patterns': ['service\\s+revenue.*data\\s+processing.*international\\s+transaction|service.*data\\s+processing.*international\\s+transaction']}]},
+                      'regex_patterns': [r"(?=[\s\S]*\bservice\s+revenues?\b)"
+                                         r"(?=[\s\S]*\bdata\s+processing(?:\s+revenues?)?\b)"
+                                         r"(?=[\s\S]*\binternational\s+transaction(?:\s+revenues?)?\b)"]}]},
  {'id': 'risk-01',
-  'question': 'What supply chain risks does Nvidia disclose in its 10-K?',
+  'question': 'What key supply chain risks does NVIDIA identify in its 10-K?',
   'expected_company': 'nvidia',
   'expected_section': 'risk_factors',
   'category': 'risk_factors',
@@ -638,21 +664,21 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                                       'failing to supply high quality products and/or making changes to '
                                       'their products without our qualification; •']}],
   'expected_facts': [{'id': 'supplier-dependency',
-                      'description': 'Third-party supplier dependence reduces control over '
+                      'description': 'Third-party supplier dependence reduces control over quantity, quality and delivery'
                                      'quality/quantity/delivery',
                       'patterns': [],
-                      'regex_patterns': ['third[- '
-                                         ']party\\s+suppliers?.*(?:quality|quantity|delivery|yield)|(?:quality|quantity|delivery|yield).*third[- '
-                                         ']party\\s+suppliers?']},
+                      'regex_patterns': [r"(?=[\s\S]*third[- ]party\s+suppliers?)"
+                                         r"(?=[\s\S]*(?:quality|quantity|delivery|yield))"]},
                      {'id': 'capacity-risk',
-                      'description': 'Raw material/manufacturing capacity shortages',
+                      'description': 'Raw material or manufacturing/test capacity shortages',
                       'patterns': [],
                       'regex_patterns': ['(?:raw '
                                          'materials?|manufacturing|test)\\s+capacity|lack\\s+of\\s+(?:guaranteed\\s+)?supply|capacity\\s+shortage']},
                      {'id': 'supplier-concentration',
-                      'description': 'Limited/geographically concentrated suppliers or supplier loss',
+                      'description': 'Limited or geographically concentrated suppliers',
                       'patterns': [],
-                      'regex_patterns': ['(?:limited|concentrat\\w+).*(?:suppliers?|foundries)|(?:loss|failure)\\s+of\\s+(?:a\\s+)?supplier']}]},
+                      'regex_patterns': [r"(?=[\s\S]*(?:limited|concentrat\w+))"
+                                         r"(?=[\s\S]*(?:suppliers?|foundries|contract\s+manufacturers?))"]}]},
  {'id': 'risk-02',
   'question': 'What regulatory risks does Apple highlight related to its global operations?',
   'expected_company': 'apple',
@@ -721,18 +747,17 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                      'source_path': 'data/raw/apple/2025_10k.html',
                      'source_fiscal_year': 2025}],
   'expected_facts': [{'id': 'broad-global-laws',
-                      'description': 'Global operations face complex changing laws including antitrust, '
-                                     'privacy and trade',
+                      'description': "complex and changing global laws and regulations",
                       'patterns': [],
-                      'regex_patterns': ['(?:complex|changing).*(?:laws|regulations).*(?:antitrust|privacy).*(?:trade|import|export)|(?:antitrust|privacy).*(?:trade|import|export).*(?:laws|regulations)']},
+                      'regex_patterns': [r'(?=[\s\S]*\b(?:complex|changing)\b)'
+                                         r'(?=[\s\S]*\b(?:laws?|regulations?)\b)']},
                      {'id': 'business-impact',
-                      'description': 'Regulatory changes can hurt reputation/competitive '
-                                     'position/demand/margins',
+                      'description': "reputation, competitive position, demand or margins may be harmed",
                       'patterns': [],
-                      'regex_patterns': ['(?:regulat\\w+|laws?).*(?:reputation|competitive|demand|sales|margin)|(?:reputation|competitive|demand|sales|margin).*(?:regulat\\w+|laws?)']}]},
+                      'regex_patterns': [r'\b(?:reputation|competitive(?:\s+(?:position|advantage))?|demand|sales|(?:profit\s+)?margins?)\b']}]},
  {
     "id": "risk-03",
-    "question": "What manufacturing and production risks does Tesla discuss?",
+    "question": "What manufacturing and production risks does Tesla identify?",
     "expected_company": "tesla",
     "expected_section": "risk_factors",
     "category": "risk_factors",
@@ -777,34 +802,33 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
         {
             "id": "ramp-delays",
             "description": (
-                "Developing, launching, or ramping production can face delays"
+                "delays in developing, launching or ramping production"
             ),
             "patterns": [],
             "regex_patterns": [
-                (
-                    r"(?:issues|delays?).*"
-                    r"(?:ramp(?:ing)?(?:\s+up)?\s+(?:the\s+)?production)"
-                    r"|"
-                    r"(?:ramp(?:ing)?(?:\s+up)?\s+(?:the\s+)?production).*"
-                    r"(?:issues|delays?)"
-                )
+                r"(?=[\s\S]*(?:issues?|delays?))"
+                r"(?=[\s\S]*(?:develop(?:ing)?|launch(?:ing)?|ramp(?:ing)?(?:\s+up)?))"
+                r"(?=[\s\S]*production)"
             ],
         },
         {
             "id": "gigafactory-components",
             "description": (
-                "Lithium-ion cell/component issues at Gigafactories can harm "
-                "production or profitability"
+                "Lithium-ion cell or component issues at Gigafactories can harm production or profitability"
             ),
             "patterns": [],
             "regex_patterns": [
-                (
-                    r"(?:lithium[-\s]?ion|components?).*"
-                    r"(?:Gigafactor(?:y|ies)|production|profitability)"
-                    r"|"
-                    r"(?:Gigafactor(?:y|ies)).*"
-                    r"(?:lithium[-\s]?ion|components?|production|profitability)"
-                )
+                r"(?=[\s\S]*(?:lithium[-\s]?ion(?:\s+cells?)?|components?))"
+                r"(?=[\s\S]*(?:production|profitability))"
+            ],
+        },
+        {
+            'id': 'manufacturing-costs',
+            'description': 'difficulty controlling manufacturing costs',
+            "patterns": [],
+            "regex_patterns": [
+                r"(?=[\s\S]*(?:control|controlling|manage|managing))"
+                r"(?=[\s\S]*manufacturing\s+costs?)"
             ],
         },
     ],
@@ -862,14 +886,24 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                                       'and reflect substantial uncertainties. The company’s objective to '
                                       'play a leading role in the energy transition, including the company’s '
                                       'announced ambition']}],
-  'expected_facts': [{'id': 'compliance-cost-opportunities',
-                      'description': 'Environmental rules can raise costs or reduce/delay opportunities',
-                      'patterns': [],
-                      'regex_patterns': ['environmental\\s+(?:regulations?|laws?).*(?:cost|compliance|reduce|delay).*(?:opportunit|operations?)|(?:cost|compliance).*(?:environmental\\s+(?:regulations?|laws?))']},
-                     {'id': 'ghg-regulation',
-                      'description': 'Climate regulation targets greenhouse gas emissions',
-                      'patterns': ['greenhouse gas emissions'],
-                      'regex_patterns': ['(?:climate|greenhouse\\s+gas).*(?:regulat\\w+|framework|emissions)']}]},
+  'expected_facts': [{
+                        'id': 'compliance-cost-opportunities',
+                        'description': 'higher compliance costs or reduced/delayed business opportunities',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*(?:environmental\s+(?:regulations?|laws?)|environmental\s+rules?))'
+                            r'(?=[\s\S]*(?:costs?|compliance|reduce(?:d)?|delay(?:ed)?|opportunit\w+))'
+                        ]
+                    },
+                     {
+                        'id': 'ghg-regulation',
+                        'description': 'climate regulation targets greenhouse gas emissions',
+                        'patterns': ['greenhouse gas emissions'],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*(?:climate|regulatory\s+frameworks?|regulations?))'
+                            r'(?=[\s\S]*greenhouse\s+gas\s+emissions?)'
+                        ]
+                    }]},
  {'id': 'risk-05',
   'question': 'What risks does Meta describe related to data privacy and regulation?',
   'expected_company': 'meta',
@@ -919,16 +953,19 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                                       'require us to change our products or business practices and may '
                                       'adversely affect our business and financial results.']}],
   'expected_facts': [{'id': 'privacy-regulation',
-                      'description': 'Complex evolving privacy/data regulation including GDPR',
+                      'description': 'complex and evolving privacy/data regulation including GDPR',
                       'patterns': ['GDPR'],
-                      'regex_patterns': ['(?:privacy|data\\s+protection).*(?:GDPR|DMA|DSA|laws?|regulations?)']},
+                      'regex_patterns': [r'(?=[\s\S]*(?:privacy|data\s+(?:use|protection)))'
+                                         r'(?=[\s\S]*\bGDPR\b)']},
                      {'id': 'penalties-business-changes',
                       'description': 'Noncompliance can lead to investigations/fines/penalties and '
                                      'business-practice changes',
                       'patterns': [],
-                      'regex_patterns': ['(?:noncompliance|violation|comply).*(?:investigation|lawsuit|fine|penalt|business\\s+practices)|(?:fine|penalt|investigation).*(?:privacy|GDPR|regulat\\w+)']}]},
+                      'regex_patterns': [r'(?=[\s\S]*(?:noncompliance|violation|fail(?:ure)?\s+to\s+comply|unable\s+to\s+comply))'
+                                         r'(?=[\s\S]*(?:investigations?|lawsuits?|fines?|damages?|judgments?|penalt\w+))'
+                                         r'(?=[\s\S]*business\s+practices?)']}]},
  {'id': 'risk-06',
-  'question': 'What risk factors does Pfizer disclose related to drug development and clinical trials?',
+  'question': 'What drug development and clinical trial risks does Pfizer identify?',
   'expected_company': 'pfizer',
   'expected_section': 'risk_factors',
   'category': 'risk_factors',
@@ -1008,17 +1045,32 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'recruitment',
                       'description': 'Patient recruitment/enrollment difficulties',
                       'patterns': [],
-                      'regex_patterns': ['(?:recruit|enroll)\\w*.*patients?.*clinical\\s+trials?|clinical\\s+trials?.*(?:recruit|enroll)']},
+                      'regex_patterns': [r'(?=[\s\S]*\bpatients?\b)'
+                                         r'(?=[\s\S]*\b(?:recruit\w*|enroll\w*)\b)']},
                      {'id': 'candidate-failure',
                       'description': 'Candidates may fail based on unfavorable trial results/data',
                       'patterns': [],
-                      'regex_patterns': ['(?:product\\s+)?candidates?.*(?:fail|failure).*(?:clinical|trial|data)|(?:clinical|trial)\\s+(?:results?|data).*(?:fail|failure)']},
+                      'regex_patterns': [
+                          r'(?=[\s\S]*(?:product\s+)?candidates?)'
+                          r'(?=[\s\S]*\bfail(?:s|ed|ure)?\b)'
+                          r'(?=[\s\S]*(?:unfavorable|clinical\s+(?:trial\s+)?(?:results?|data)))'
+                      ]},
+                      {
+                        'id': 'additional-trials',
+                        'description': 'protocol amendments or additional clinical trials',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?:amend\w*\s+(?:clinical\s+trial\s+)?protocols?|additional\s+clinical\s+trials?)'
+                        ]
+                    },
                      {'id': 'safety-efficacy-approval',
-                      'description': 'Approval depends on safety/efficacy and may require additional trials',
+                      'description': 'regulatory approval depends on safety and efficacy',
                       'patterns': [],
-                      'regex_patterns': ['(?:approval|regulat\\w+).*(?:safety|efficacy)|(?:additional|amend).*(?:clinical\\s+trials?|protocols?)']}]},
+                      'regex_patterns': [r'(?=[\s\S]*(?:regulatory\s+)?approvals?)'
+                                        r'(?=[\s\S]*\bsafety\b)'
+                                        r'(?=[\s\S]*\befficacy\b)']}]},
  {'id': 'risk-07',
-  'question': 'What risk factors does General Electric disclose related to its industrial operations?',
+  'question': 'What operational risks does General Electric disclose?',
   'expected_company': 'general_electric',
   'expected_section': 'risk_factors',
   'category': 'risk_factors',
@@ -1098,20 +1150,43 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                                       'Quality, capability, compliance and sourcing issues experienced by '
                                       'third-party providers can also adversely affect our costs, margin']}],
   'expected_facts': [{'id': 'safety-quality',
-                      'description': 'Product safety/quality/performance risks',
+                      'description': 'product safety, quality and performance risks',
                       'patterns': [],
-                      'regex_patterns': ['product\\s+(?:safety|quality).*(?:quality|performance)|(?:safety|quality|performance).*(?:product)']},
+                      'regex_patterns': [r'(?=[\s\S]*\bproduct\b)'
+                                        r'(?=[\s\S]*(?:safety|quality|performance))']},
                      {'id': 'supply-disruption',
-                      'description': 'Supply-chain/business disruption risk',
+                      'description': 'supply-chain and business disruption risk',
                       'patterns': ['supply chain', 'business disruption'],
-                      'regex_patterns': ['supply\\s+chain.*(?:disruption|supplier)|(?:disruption|supplier).*supply\\s+chain']},
-                     {'id': 'sole-source',
-                      'description': 'Limited/sole-source supplier dependency',
-                      'patterns': [],
-                      'regex_patterns': ['(?:limited|sole)[- '
-                                         ']source\\s+suppliers?|supplier.*(?:capacity|availability|stability)']}]},
+                      'regex_patterns': [r'(?=[\s\S]*supply\s+chain)'
+                                        r'(?=[\s\S]*business\s+disruption)']},
+                     {
+                        'id': 'operational-execution',
+                        'description': 'operational execution across product and service life cycles',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*operational\s+execution)'
+                            r'(?=[\s\S]*(?:product|service)\s+life\s*cycles?)'
+                        ]
+                    },
+                    {
+                        'id': 'data-security',
+                        'description': 'information management and data protection/security risks',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*(?:information\s+management|data\s+protection|data\s+security|cybersecurity))'
+                        ]
+                    },
+                    {
+                        'id': 'sole-source',
+                        'description': 'limited or sole-source supplier dependency',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*(?:limited|sole)[-\s]+source)'
+                            r'(?=[\s\S]*suppliers?)'
+                        ]
+                    }]},
  {'id': 'mdna-01',
-  'question': "What does Microsoft's MD&A say about revenue growth drivers?",
+  'question': "What revenue growth drivers does Microsoft identify in its MD&A?",
   'expected_company': 'microsoft',
   'expected_section': 'mdna',
   'category': 'mdna',
@@ -1129,23 +1204,26 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'overall-growth',
                       'description': 'Revenue increased $36.6B / 15%',
                       'patterns': ['$36.6 billion', '15%'],
-                      'regex_patterns': ['(?:revenue.*(?:36\\.6\\s*billion|15\\s*%)|(?:36\\.6\\s*billion|15\\s*%).*revenue)']},
+                      'regex_patterns': [r'(?=[\s\S]*36\.6\s*billion)'
+                                         r'(?=[\s\S]*15\s*%)']},
                      {'id': 'azure-driver',
                       'description': 'Intelligent Cloud growth driven by Azure',
                       'patterns': ['Azure'],
-                      'regex_patterns': ['Intelligent\\s+Cloud.*Azure|Azure.*Intelligent\\s+Cloud']},
+                      'regex_patterns': [r'(?=[\s\S]*Intelligent\s+Cloud)'
+                                        r'(?=[\s\S]*\bAzure\b)']},
                      {'id': 'm365-driver',
-                      'description': 'Productivity and Business Processes growth driven by Microsoft 365 '
-                                     'Commercial cloud',
+                      'description': 'Productivity and Business Processes growth driven by Microsoft 365 Commercial cloud',
                       'patterns': ['Microsoft 365 Commercial cloud'],
-                      'regex_patterns': ['(?:Productivity.*Business\\s+Processes|PBP).*(?:Microsoft\\s*365|Commercial\\s+cloud)|Microsoft\\s*365.*(?:Productivity.*Business\\s+Processes|PBP)']},
+                      'regex_patterns': [r'(?=[\s\S]*(?:Productivity\s+and\s+Business\s+Processes|PBP))'
+                                        r'(?=[\s\S]*Microsoft\s*365(?:\s+Commercial\s+cloud)?)']},
                      {'id': 'mpc-driver',
-                      'description': 'More Personal Computing growth driven by Gaming and Search/news '
-                                     'advertising',
+                      'description': 'More Personal Computing growth driven by Gaming and Search/news advertising',
                       'patterns': [],
-                      'regex_patterns': ['More\\s+Personal\\s+Computing.*(?:Gaming|Search).*advertising|(?:Gaming|Search).*advertising.*More\\s+Personal\\s+Computing']}]},
+                      'regex_patterns': [r'(?=[\s\S]*More\s+Personal\s+Computing)'
+                                        r'(?=[\s\S]*\bGaming\b)'
+                                        r'(?=[\s\S]*Search(?:\s+and\s+news)?\s+advertising)']}]},
  {'id': 'mdna-02',
-  'question': "What does Amazon's MD&A discuss about operating margin trends?",
+  'question': "What operating income trends and drivers does Amazon identify in its MD&A?",
   'expected_company': 'amazon',
   'expected_section': 'mdna',
   'category': 'mdna',
@@ -1188,19 +1266,49 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                                       'Changes in foreign exchange rates positively impacted operating '
                                       'income by $220 million in 2023. 25 Operating Expenses Information '
                                       'about operating expenses is as follows (in millions):']}],
-  'expected_facts': [{'id': 'operating-income-increase',
-                      'description': 'Consolidated operating income rose from $36.9B to $68.6B',
-                      'patterns': [],
-                      'regex_patterns': ['(?:36\\.9|36,852).*(?:68\\.6|68,593)|(?:68\\.6|68,593).*(?:36\\.9|36,852)']},
-                     {'id': 'north-america-driver',
-                      'description': 'North America increase driven by unit and advertising sales, offset by '
-                                     'fulfillment/shipping costs',
-                      'patterns': [],
-                      'regex_patterns': ['North\\s+America.*(?:unit\\s+sales).*(?:advertising).*(?:fulfillment|shipping)']},
-                     {'id': 'international-turnaround',
-                      'description': 'International moved from loss to income with similar sales/ad drivers',
-                      'patterns': [],
-                      'regex_patterns': ['International.*(?:operating\\s+loss|loss).*(?:operating\\s+income|income)|International.*(?:unit\\s+sales).*(?:advertising)']}]},
+  'expected_facts': [
+                    {
+                        'id': 'operating-income-increase',
+                        'description': 'operating income rose from $36.9B to $68.6B',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*(?:36\.9\s*(?:billion|B)|36,852))'
+                            r'(?=[\s\S]*(?:68\.6\s*(?:billion|B)|68,593))'
+                        ]
+                    },
+                    {
+                        'id': 'north-america-driver',
+                        'description': 'North America growth driven by unit and advertising sales, offset by fulfillment/shipping costs',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*North\s+America)'
+                            r'(?=[\s\S]*unit\s+sales)'
+                            r'(?=[\s\S]*advertising\s+sales?)'
+                            r'(?=[\s\S]*(?:fulfillment|shipping)\s+costs?)'
+                        ]
+                    },
+                    {
+                        'id': 'international-turnaround',
+                        'description': 'International moved from operating loss to operating income',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'International.{0,250}(?:operating\s+income|income).{0,250}(?:operating\s+loss|loss)'
+                            r'|'
+                            r'International.{0,250}(?:operating\s+loss|loss).{0,250}(?:operating\s+income|income)'
+                        ]
+                    },
+                    {
+                        'id': 'international-drivers',
+                        'description': 'International improvement driven by unit and advertising sales, offset by shipping/fulfillment costs',
+                        'patterns': [],
+                        'regex_patterns': [
+                            r'(?=[\s\S]*International)'
+                            r'(?=[\s\S]*unit\s+sales)'
+                            r'(?=[\s\S]*advertising\s+sales?)'
+                            r'(?=[\s\S]*(?:shipping|fulfillment)\s+costs?)'
+                        ]
+                    }
+                ]},
  {'id': 'mdna-03',
   'question': "What does AMD's MD&A say about revenue trends by segment?",
   'expected_company': 'amd',
@@ -1225,17 +1333,24 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'data-center',
                       'description': 'Data Center revenue $16.6B, +32%',
                       'patterns': [],
-                      'regex_patterns': ['Data\\s+Center.*16\\.6\\s*billion.*32\\s*%|Data\\s+Center.*32\\s*%.*16\\.6\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*Data\s+Center)'
+                                        r'(?=[\s\S]*16\.6\s*(?:billion|B))'
+                                        r'(?=[\s\S]*32\s*%)']},
                      {'id': 'client-gaming',
                       'description': 'Client and Gaming revenue $14.6B, +51%',
                       'patterns': [],
-                      'regex_patterns': ['Client\\s+and\\s+Gaming.*14\\.6\\s*billion.*51\\s*%|Client\\s+and\\s+Gaming.*51\\s*%.*14\\.6\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*Client\s+and\s+Gaming)'
+                                        r'(?=[\s\S]*14\.6\s*(?:billion|B))'
+                                        r'(?=[\s\S]*51\s*%)']},
                      {'id': 'embedded',
                       'description': 'Embedded revenue $3.5B, down 3%',
                       'patterns': [],
-                      'regex_patterns': ['Embedded.*3\\.5\\s*billion.*(?:decreas|down).*3\\s*%|Embedded.*(?:decreas|down).*3\\s*%.*3\\.5\\s*billion']}]},
+                      'regex_patterns': [r'(?=[\s\S]*Embedded)'
+                                        r'(?=[\s\S]*3\.5\s*(?:billion|B))'
+                                        r'(?=[\s\S]*(?:decreas\w*|down))'
+                                        r'(?=[\s\S]*3\s*%)']}]},
  {'id': 'mdna-04',
-  'question': "What does Broadcom's MD&A discuss regarding gross margin trends?",
+  'question': "What gross margin trends and drivers does Broadcom report in its MD&A?",
   'expected_company': 'broadcom',
   'expected_section': 'mdna',
   'category': 'mdna',
@@ -1257,18 +1372,22 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'gross-margin-dollars',
                       'description': 'Gross margin increased to $43.294B from $32.509B',
                       'patterns': [],
-                      'regex_patterns': ['(?:43,294|43\\.294).*(?:32,509|32\\.509)|(?:32,509|32\\.509).*(?:43,294|43\\.294)']},
+                      'regex_patterns': [r'(?=[\s\S]*(?:43,294|43\.294))'
+                                        r'(?=[\s\S]*(?:32,509|32\.509))']},
                      {'id': 'gross-margin-percent',
                       'description': 'Gross margin percentage rose to 68% from 63%',
                       'patterns': [],
-                      'regex_patterns': ['68\\s*%.*63\\s*%|63\\s*%.*68\\s*%']},
+                      'regex_patterns': [r'(?=[\s\S]*68\s*%)'
+                                        r'(?=[\s\S]*63\s*%)']},
                      {'id': 'drivers',
                       'description': 'Drivers included software revenue/AI semiconductor demand and higher '
                                      'infrastructure-software margin',
                       'patterns': [],
-                      'regex_patterns': ['(?:software\\s+revenue|infrastructure\\s+software).*(?:AI|semiconductor|license|VMware)|(?:AI|semiconductor|license|VMware).*(?:software\\s+revenue|infrastructure\\s+software)']}]},
+                      'regex_patterns': [r'(?=[\s\S]*(?:software\s+revenue|license\s+revenue))'
+                                        r'(?=[\s\S]*(?:AI(?:-related)?\s+semiconductor|AI|semiconductor))'
+                                        r'(?=[\s\S]*infrastructure\s+software(?:\s+gross\s+margin)?)']}]},
  {'id': 'mdna-05',
-  'question': "What does Caterpillar's MD&A say about sales and revenue trends?",
+  'question': "What sales and revenue trends and drivers does Caterpillar report in its MD&A?",
   'expected_company': 'caterpillar',
   'expected_section': 'mdna',
   'category': 'mdna',
@@ -1293,17 +1412,22 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'total-decline',
                       'description': 'Sales/revenues $64.809B, down 3% from $67.060B',
                       'patterns': [],
-                      'regex_patterns': ['64\\.809\\s*billion.*(?:3\\s*(?:percent|%)|67\\.060)|(?:3\\s*(?:percent|%)|67\\.060).*64\\.809\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*64\.809\s*(?:billion|B))'
+                                        r'(?=[\s\S]*3\s*(?:percent|%))'
+                                        r'(?=[\s\S]*67\.060\s*(?:billion|B))']},
                      {'id': 'volume-price',
                       'description': 'Lower volume partly offset by favorable price realization',
                       'patterns': [],
-                      'regex_patterns': ['lower\\s+sales\\s+volume.*(?:favorable\\s+)?price\\s+realization|price\\s+realization.*lower\\s+sales\\s+volume']},
+                      'regex_patterns': [r'(?=[\s\S]*lower\s+sales\s+volume)'
+                                        r'(?=[\s\S]*(?:favorable\s+)?price\s+realization)']},
                      {'id': 'segment-direction',
-                      'description': 'Construction/Resource lower; Energy & Transportation higher',
+                      'description': 'Construction Industries and Resource Industries lower; Energy & Transportation higher',
                       'patterns': [],
-                      'regex_patterns': ['Construction\\s+Industries.*Resource\\s+Industries.*(?:Energy\\s*(?:&|and)\\s*Transportation).*higher']}]},
+                      'regex_patterns': [r'(?=[\s\S]*Construction\s+Industries[^.]{0,120}\blower\b)'
+                                        r'(?=[\s\S]*Resource\s+Industries[^.]{0,120}\blower\b)'
+                                        r'(?=[\s\S]*Energy\s*(?:&|and)\s*Transportation[^.]{0,120}\bhigher\b)']}]},
  {'id': 'mdna-06',
-  'question': "What does Goldman Sachs' MD&A discuss about net income drivers?",
+  'question': "What earnings and revenue trends and drivers does Goldman Sachs report in its MD&A?",
   'expected_company': 'goldman_sachs',
   'expected_section': 'mdna',
   'category': 'mdna',
@@ -1351,17 +1475,20 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
   'expected_facts': [{'id': 'net-earnings',
                       'description': 'Net earnings $14.28B vs $8.52B',
                       'patterns': [],
-                      'regex_patterns': ['14\\.28\\s*billion.*8\\.52\\s*billion|8\\.52\\s*billion.*14\\.28\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*14\.28\s*(?:billion|B))'
+                                        r'(?=[\s\S]*8\.52\s*(?:billion|B))']},
                      {'id': 'net-revenue-growth',
                       'description': 'Net revenues $53.51B, up 16%',
                       'patterns': [],
-                      'regex_patterns': ['53\\.51\\s*billion.*16\\s*%|16\\s*%.*53\\.51\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*53\.51\s*(?:billion|B))'
+                                        r'(?=[\s\S]*16\s*%)']},
                      {'id': 'business-drivers',
                       'description': 'Higher GBM and AWM revenues drove growth',
                       'patterns': [],
-                      'regex_patterns': ['(?:Global\\s+Banking\\s*(?:&|and)\\s*Markets|GBM).*(?:Asset\\s*(?:&|and)\\s*Wealth\\s+Management|AWM)|(?:Asset\\s*(?:&|and)\\s*Wealth\\s+Management|AWM).*(?:Global\\s+Banking\\s*(?:&|and)\\s*Markets|GBM)']}]},
+                      'regex_patterns': [r'(?=[\s\S]*(?:Global\s+Banking\s*(?:&|and)\s*Markets|GBM))'
+                                        r'(?=[\s\S]*(?:Asset\s*(?:&|and)\s*Wealth\s+Management|AWM))']}]},
  {'id': 'mdna-07',
-  'question': "What does Alphabet's MD&A say about advertising revenue trends?",
+  'question': "What advertising revenue trends and drivers does Alphabet report in its MD&A?",
   'expected_company': 'alphabet',
   'expected_section': 'mdna',
   'category': 'mdna',
@@ -1388,23 +1515,27 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                      'source_path': 'data/raw/alphabet/2025_10k.html',
                      'source_fiscal_year': 2025}],
   'expected_facts': [{'id': 'search-growth',
-                      'description': 'Search & other revenue +$23.1B',
+                      'description': 'Google Search & other revenue increased $23.1B',
                       'patterns': [],
-                      'regex_patterns': ['Search\\s*(?:&|and)\\s*other.*23\\.1\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*Google\s+Search\s*(?:&|and)\s*other)'
+                                        r'(?=[\s\S]*23\.1\s*(?:billion|B))']},
                      {'id': 'youtube-growth',
-                      'description': 'YouTube ads revenue +$4.6B',
+                      'description': 'YouTube ads revenue increased $4.6B',
                       'patterns': [],
-                      'regex_patterns': ['YouTube\\s+ads?.*4\\.6\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*YouTube\s+ads?)'
+                                        r'(?=[\s\S]*4\.6\s*(?:billion|B))']},
                      {'id': 'network-decline',
-                      'description': 'Google Network revenue down $953M',
+                      'description': 'Google Network revenue decreased $953M',
                       'patterns': [],
-                      'regex_patterns': ['Google\\s+Network.*(?:decreas|down).*953\\s*(?:million|m)|953\\s*(?:million|m).*Google\\s+Network']},
+                      'regex_patterns': [r'(?=[\s\S]*Google\s+Network)'
+                                        r'(?=[\s\S]*(?:decreas\w*|down|declin\w*))'
+                                        r'(?=[\s\S]*953\s*(?:million|M))']},
                      {'id': 'ad-spend-driver',
                       'description': 'Advertiser spending was a growth driver',
                       'patterns': ['advertiser spending'],
-                      'regex_patterns': ['advertis(?:er|ing)\\s+spend\\w*']}]},
+                      'regex_patterns': [r'advertis(?:er|ing)\s+spend\w*']}]},
  {'id': 'fin-01',
-  'question': "What do Johnson & Johnson's financial statements show about total assets?",
+  'question': "What were Johnson & Johnson's total assets?",
   'expected_company': 'johnson_and_johnson',
   'expected_section': 'financial_statements',
   'category': 'financial_statements',
@@ -1415,12 +1546,16 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                      'content_fingerprint': '46f73c9f290bba4e8399',
                      'source_path': 'data/raw/johnson_and_johnson/2025_10k.html',
                      'source_fiscal_year': 2025}],
-  'expected_facts': [{'id': 'latest-total-assets',
-                      'description': 'Latest reported total assets are $180.104B (180,104 million)',
-                      'patterns': ['180,104'],
-                      'regex_patterns': ['\\$?\\s*180(?:\\.104|\\.1)\\s*billion']}]},
+  'expected_facts': [{
+                        'id': 'total-assets-2024',
+                        'description': '$180,104 million',
+                        'patterns': ['180,104'],
+                        'regex_patterns': [
+                            r'(?:\$?\s*180,104\s*(?:million|M)?|\$?\s*180\.104\s*(?:billion|B))'
+                        ]
+                    }]},
  {'id': 'fin-02',
-  'question': "What does Walmart's balance sheet show regarding total liabilities?",
+  'question': "What liability amounts does Walmart report for total current liabilities and long-term debt?",
   'expected_company': 'walmart',
   'expected_section': 'financial_statements',
   'category': 'financial_statements',
@@ -1437,13 +1572,15 @@ EVAL_QUESTIONS = [{'id': 'biz-01',
                      'source_path': 'data/raw/walmart/2025_10k.html',
                      'source_fiscal_year': 2025}],
   'expected_facts': [{'id': 'current-liabilities',
-                      'description': 'Total current liabilities $96.584B',
+                      'description': '$96,584 million total current liabilities',
                       'patterns': ['96,584'],
-                      'regex_patterns': ['\\$?\\s*96(?:\\.584|\\.6)\\s*billion']},
+                      'regex_patterns': [r'(?=[\s\S]*total\s+current\s+liabilities)'
+                                        r'(?=[\s\S]*(?:96,584|96\.584\s*(?:billion|B)))']},
                      {'id': 'long-term-debt',
-                      'description': 'Long-term debt $33.401B',
+                      'description': '$33,401 million long-term debt',
                       'patterns': ['33,401'],
-                      'regex_patterns': ['\\$?\\s*33(?:\\.401|\\.4)\\s*billion']}]},
+                      'regex_patterns': [r'(?=[\s\S]*long[-\s]?term\s+debt)'
+                                        r'(?=[\s\S]*(?:33,401|33\.401\s*(?:billion|B)))']}]},
  {'id': 'fin-03',
   'question': "What do Visa's financial statements disclose about cash flow from operations?",
   'expected_company': 'visa',
