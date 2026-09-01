@@ -168,7 +168,7 @@ The system is evaluated on a **28-question development/regression benchmark** sp
 | Section routing accuracy    |        100.0% |        100.0% |
 | Metadata retrieval hit rate |        100.0% |        100.0% |
 | Evidence retrieval recall@8 | 63.0% (29/46) | 69.6% (32/46) |
-| Answer fact completeness    | 43.0% (34/79) | 75.9% (60/71) |
+| Answer fact completeness    | 43.0% (34/79) | 75.9% (60/79) |
 | Tool errors                 |           N/A |             0 |
 
 The agentic pipeline substantially improves answer completeness. The rule-based path is still useful as a deterministic baseline, and it's faster in end-to-end runs.
